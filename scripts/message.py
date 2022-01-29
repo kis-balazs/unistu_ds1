@@ -1,37 +1,42 @@
 import pickle
-from vectorclock import VectorClock
+from scripts.vectorclock import VectorClock
 
 class Message:
     # in-class class to access the decode message's fields using dot notation
-    class __dotdict(dict):
+    class _dotdict(dict):
         __getattr__ = dict.get
 
-    MSG_TYPES = ['text_message', 'election_message']
-
     @staticmethod
-    def encode(vc: VectorClock, type: str, msg: str) -> None:
-        assert type in Message.MSG_TYPES, 'type parameter not recognized'
+    def encode(vc: VectorClock, type: str, success: bool, msg: str) -> None:
         # serialize the message together with the vector clock
         json_data = {
-            'vc': vc,
+            'vc': vc.vcDictionary,
             'type': type,
-            'body': msg
+            'body': msg,
+            'success': success
         }
         return pickle.dumps(json_data)
 
     @staticmethod
     def decode(pickledata):
-        data = pickle.loads(pickledata)
-        assert data['type'] in Message.MSG_TYPES, 'type parameter not recognized'
-        return Message.__dotdict(data)
+        data = Message._dotdict(pickle.loads(pickledata))
+        Message.dotdictify(data)
+        return data
+
+    @staticmethod
+    def dotdictify(d):
+        for _, v in d.items():
+            if type(v) == dict:
+                v = Message._dotdict(v)
+                Message.dotdictify(v)
 
 
 if __name__ == '__main__':
     vc = VectorClock(1)
 
-    y = Message.encode(vc, 'text_message', 'hi')
+    y = Message.encode(vc, 'text_message', True, 'hi')
     
     x = Message.decode(y)
     print(x.type)
     print(x.body)
-    print(x.vc.vcDictionary)
+    print(x.vc)

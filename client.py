@@ -2,54 +2,72 @@
 import logging
 import threading
 import socket
+import uuid
+import pickle
 
 import discovery
+from scripts.message import Message
+from scripts.vectorclock import VectorClock
 
-SERVER_PORT = 5000
+SERVER_PORT = 5001
 ACK_MSG = "ack"
 
 class Client(threading.Thread):
-    def __init__(self, address):
+    def __init__(self, address, nickname):
         threading.Thread.__init__(self)
         self._primary = address
         self._sock = None
+        self._nickname = nickname
+        self.onreceive = None
+        self.vc = VectorClock()
+        self.uuid = None
 
     def run(self):
         self._sock = self._createSocket((self._primary, SERVER_PORT))
         try:
-            message = input("Enter message: ")
-            self._sendMessage(message)
+            while True:
+                data = self._sock.recv(1024)
+                if len(data) > 0:
+                    self._handleMessage(data)
         finally:
             self._sock.close()
 
     def _createSocket(self, address):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5)
         sock.connect(address)
         return sock
 
-    def _sendMessage(self, message):
-        for i in range(3):
-            self._sock.sendall(message.encode("UTF-8"))
-            if self._waitAck(): break
-        else:
-            logging.error('Failed to send')
+    def _handleMessage(self, data):
+        msg = Message.decode(data)
+        if msg.type == "join_cluster":
+            self.vc = VectorClock(copyDict=msg.vc)
+            self.uuid = uuid.UUID(msg.body['uuid'])  # todo make dot access to every sub-dict of dictionaries
+        elif msg.type == "send_text":
+            if self.onreceive is not None:
+                self.onreceive(msg.body)
 
-    def _waitAck(self):
-        try:
-            data = self._sock.recv(1024).decode("UTF-8")
-            return data == ACK_MSG
-        except socket.timeout:
-            return False
-
+    def sendMessage(self, message):
+        self.vc.increaseClock(self.uuid)
+        self._sock.sendall(Message.encode(self.vc, 'send_text', True, message))
 
 # Run main
 logging.basicConfig(format='[%(asctime)s] [%(levelname)-05s] %(message)s', level=logging.DEBUG)
 
+nickname = None
+while nickname == None:  
+    nickname = input("\n Enter a nickname: ")
+
+def receive_message(msg):
+    print("\n" +msg)
+
 primary = discovery.find_primary()
 if primary is not None:
-    client = Client(primary)
+    client = Client(primary, nickname)
+    client.onreceive = receive_message
     client.start()
-    client.join()
+
+    while True:
+        msg = input("> Enter message: ")
+        client.sendMessage(msg)
 else:
     logging.error("No primary found")

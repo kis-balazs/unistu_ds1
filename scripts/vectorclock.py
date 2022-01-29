@@ -1,15 +1,22 @@
 class VectorClock:
-    def __init__(self, id):
-        if id == None:
-            self.vcDictionary = {}
+    def __init__(self, id=None, copyDict=None):
+        assert not (id is not None and copyDict is not None)
+        if copyDict is not None:
+            self.vcDictionary = copyDict
         else:
-            self.vcDictionary = {(id): 0}
+            if id == None:
+                self.vcDictionary = {}
+            else:
+                assert copyDict is None
+                self.vcDictionary = {str(id): 0}
+        
+        print(self.vcDictionary)
 
     def increaseClock(self, id):
-        self.vcDictionary[(id)] += 1
+        self.vcDictionary[str(id)] += 1
 
     def addParticipantToClock(self, id):
-        self.vcDictionary[id] = 0
+        self.vcDictionary[str(id)] = 0
 
     def printClock(self):
         print("\n[VECTORCLOCK]: ", str(self.vcDictionary))

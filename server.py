@@ -6,9 +6,10 @@ import signal
 import multiprocessing
 
 import discovery
+from scripts.message import Message
+from scripts.middleware import Middleware
 
-SERVER_PORT = 5000
-ACK_MSG = "ack"
+SERVER_PORT = 5001
 
 class Server(threading.Thread):
     def __init__(self):
@@ -85,19 +86,32 @@ class ClientConnection(threading.Thread):
         threading.Thread.__init__(self)
         self._sock = sock
         self._address = address
+        self._client = None
 
     def run(self):
         try:
-            data = self._sock.recv(1024).decode("UTF-8")
-            logging.info(f"Client sent: {data}")
-            self._sock.sendall(ACK_MSG.encode('UTF-8'))
-        except:
+            self._clientJoin()
+            self._eventLoop()
+        except Exception as e:
+            logging.warning("Some error: " + str(e))
             self._sock.close()
 
     def terminate(self):
         print("terminate connection")
         self._sock.shutdown(socket.SHUT_RDWR)
         self._sock.close()
+
+    def _clientJoin(self):
+        self._client = Middleware.get().joinClient(self)
+
+    def _eventLoop(self):
+        while True:
+            data = self._sock.recv(1024)
+            if len(data) > 0 and self._client is not None:
+                self._client.receive(data)
+
+    def send(self, data):
+        self._sock.sendall(data)
 
 # Run main
 logging.basicConfig(format='[%(asctime)s] [%(levelname)-05s] %(message)s', level=logging.DEBUG)
