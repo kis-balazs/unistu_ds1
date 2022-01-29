@@ -1,5 +1,4 @@
 class VectorClock:
-
     def __init__(self, id):
         if id == None:
             self.vcDictionary = {}
