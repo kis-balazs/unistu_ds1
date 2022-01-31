@@ -1,3 +1,4 @@
+from pydoc import cli
 import time
 import tkinter
 import random
@@ -18,6 +19,7 @@ def user_interface():
         msg_list.insert(tkinter.END, msg)
 
     def init_client():
+        global client
         # networking init
         primary = discovery.find_primary()
         if primary is not None:
@@ -28,7 +30,8 @@ def user_interface():
             # alert
             pass
 
-    def send():
+    def send(a=None):
+        global client
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         client.sendMessage(my_msg.get())
 
@@ -62,7 +65,7 @@ def user_interface():
     send_button.pack()
 
     top.protocol("WM_DELETE_WINDOW", on_closing)
-    
+
     tkinter.mainloop()  # Starts GUI execution.
 
 

@@ -39,6 +39,12 @@ class Middleware:
     def clientDisconnected(self, client):
         self.clients.pop(str(client.uuid))
 
+    def newMessage(self, send_client, message):
+        self.vc.increaseClock(send_client.uuid)
+        for client in self.clients.values():
+            data = Message.encode(self.vc, 'send_text', True, message)
+            client.send(data)
+
 class Client:
     def __init__(self, conn):
         self.uuid = uuid.uuid4()
@@ -52,6 +58,7 @@ class Client:
         msg = Message.decode(data)
         if msg.type == 'send_text':
             self._logger.info('received text: {}'.format(msg.body))
+            Middleware.get().newMessage(self, msg.body)
 
     def closeConnection(self):
         Middleware.get().vc.increaseClock(self.uuid)
