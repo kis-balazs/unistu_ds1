@@ -29,9 +29,9 @@ def find_primary():
             return address[0]
     except socket.timeout:
         discovery_logger.debug('Timed out')
+        return None
     finally:
         broadcast_socket.close()
-
     return None
 
 
