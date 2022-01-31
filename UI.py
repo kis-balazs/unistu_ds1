@@ -46,10 +46,11 @@ def user_interface():
     top = tkinter.Tk()
     top.title("Chatter")
 
+    top.withdraw()
     nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:", parent=top)
     if nickname:
         init_client(nickname)
-        top.focus_force()
+        top.deiconify()
     else:
         return
 
