@@ -4,6 +4,7 @@ import select
 import signal
 import socket
 import threading
+import queue
 
 import discovery
 from scripts.middleware import Middleware
@@ -84,6 +85,7 @@ class ClientConnection(threading.Thread):
         self._address = address
         self._client = None
         self._logger = logging.getLogger("client_conn<{}>".format(self._address[0]))
+        self._outQueue = queue.Queue(maxsize=1024)
 
     def run(self):
         self._sock.setblocking(0)
@@ -103,12 +105,26 @@ class ClientConnection(threading.Thread):
         self._client = Middleware.get().joinClient(self)
 
     def _eventLoop(self):
+        outputs = []
         while not self._stopRequest:
-            ready = select.select([self._sock], [], [], 0.5)
-            if ready[0]:
+            readable, writable, exceptional = select.select([self._sock], outputs, [], 0.5)
+            if self._sock in readable:
                 data = self._sock.recv(1024)
                 if data:
                     self._client.receive(data)
+
+            if not self._outQueue.empty():
+                outputs = [self._sock]
+            else:
+                outputs = []
+
+            if self._sock in writable:
+                try:
+                    data = self._outQueue.get_nowait()
+                except queue.Empty:
+                    outputs = []
+                else:
+                    self._sock.sendall(data)
 
             # Check if socket is still open
             if self._isSocketClosed():
@@ -128,7 +144,7 @@ class ClientConnection(threading.Thread):
         return False
 
     def send(self, data):
-        self._sock.sendall(data)
+        self._outQueue.put(data)
 
 
 # Run main

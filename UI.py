@@ -1,5 +1,5 @@
-import logging
 import sys
+import logging
 import tkinter
 from threading import Thread
 from tkinter import messagebox
@@ -30,8 +30,7 @@ def user_interface():
             messagebox.showerror('Error!', 'Server not available!')
             sys.exit(1)
 
-    def send():
-        global client
+    def send(_=None):
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         client.sendMessage("<{}> {}".format(client._nickname, my_msg.get()))
         my_msg.set("")
@@ -57,7 +56,7 @@ def user_interface():
 
     messages_frame = tkinter.Frame(top)
     my_msg = tkinter.StringVar()  # For the messages to be sent.
-
+    my_msg.set("Type your messages here.")
     scrollbar = tkinter.Scrollbar(messages_frame)  # To navigate through past messages.
     # Following will contain the messages.
     msg_list = tkinter.Listbox(messages_frame, height=15, width=50, yscrollcommand=scrollbar.set)
@@ -77,5 +76,7 @@ def user_interface():
     tkinter.mainloop()  # Starts GUI execution.
 
 
+if __name__ == '__main__':
+    Thread(target=user_interface).start()
 if __name__ == '__main__':
     Thread(target=user_interface).start()
