@@ -43,14 +43,15 @@ def user_interface():
             client.shutdown()
 
     # ############################################################################################
-    nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:")
-    if nickname:
-        init_client(nickname)
-    else:
-        return
-
     top = tkinter.Tk()
     top.title("Chatter")
+
+    nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:", parent=top)
+    if nickname:
+        init_client(nickname)
+        top.focus_force()
+    else:
+        return
 
     messages_frame = tkinter.Frame(top)
     my_msg = tkinter.StringVar()  # For the messages to be sent.
