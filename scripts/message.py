@@ -5,7 +5,7 @@ from scripts.vectorclock import VectorClock
 
 class Message:
     # in-class class to access the decode message's fields using dot notation
-    class _dotdict(dict):
+    class DotDict(dict):
         __getattr__ = dict.get
 
     @staticmethod
@@ -21,17 +21,16 @@ class Message:
 
     @staticmethod
     def decode(pickledata):
-        data = Message._dotdict(pickle.loads(pickledata))
-        Message.dotdictify(data.body)
+        data = Message.DotDict(pickle.loads(pickledata))
+        data.body = Message.dotdictify(data.body)
         return data
 
     @staticmethod
     def dotdictify(d):
         if isinstance(d, dict):
-            for k, v in d.items():
-                if isinstance(v, dict):
-                    d[k] = Message._dotdict(v)
-                    Message.dotdictify(v)
+            return Message.DotDict(d)
+        else:
+            return d
 
 
 if __name__ == '__main__':

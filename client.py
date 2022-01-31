@@ -45,13 +45,15 @@ class Client(threading.Thread):
         msg = Message.decode(data)
         if msg.type == "join_cluster":
             self.vc = VectorClock(copyDict=msg.vc)
-            self.uuid = uuid.UUID(msg.body['uuid'])  # todo make dot access to every sub-dict of dictionaries
+            self.uuid = uuid.UUID(msg.body.uuid)
         elif msg.type == "send_text":
             self._logger.debug("receiving text: '{}'".format(msg.body))
             if self.onreceive is not None:
                 self.onreceive(msg.body)
         elif msg.type == "server_close":
             self._logger.info("Server closed")
+            if self.onreceive is not None:
+                self.onreceive('$> server disconnected...')
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))
