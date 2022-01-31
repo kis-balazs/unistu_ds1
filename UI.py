@@ -13,7 +13,6 @@ logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s',
 
 client = None
 
-
 def user_interface():
     # ############################################################################################
     def receive(msg):
@@ -41,6 +40,7 @@ def user_interface():
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             top.destroy()
+            client.shutdown()
 
     # ############################################################################################
     init_client()
