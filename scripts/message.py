@@ -22,21 +22,22 @@ class Message:
     @staticmethod
     def decode(pickledata):
         data = Message._dotdict(pickle.loads(pickledata))
-        Message.dotdictify(data)
+        Message.dotdictify(data.body)
         return data
 
     @staticmethod
     def dotdictify(d):
-        for k, v in d.items():
-            if type(v) == dict:
-                d[k] = Message._dotdict(v)
-                Message.dotdictify(v)
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    d[k] = Message._dotdict(v)
+                    Message.dotdictify(v)
 
 
 if __name__ == '__main__':
-    vc = VectorClock(1)
+    vc = VectorClock('UI-123-23423')
 
-    y = Message.encode(vc, 'text_message', True, {'hi': 'hello'})
+    y = Message.encode(vc, 'text_message', True, {'hi': 'aa'})
 
     x = Message.decode(y)
     print(x.type)
