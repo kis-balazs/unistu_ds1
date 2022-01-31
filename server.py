@@ -85,6 +85,7 @@ class ClientConnection(threading.Thread):
         self._logger = logging.getLogger("client_conn<{}>".format(self._address[0]))
 
     def run(self):
+        self._sock.setblocking(0)
         try:
             self._clientJoin()
             self._eventLoop()
@@ -116,7 +117,7 @@ class ClientConnection(threading.Thread):
 
     def _isSocketClosed(self):
         try:
-            data = self._sock.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+            data = self._sock.recv(16, socket.MSG_PEEK)
             if len(data) == 0:
                 return True
         except BlockingIOError:
