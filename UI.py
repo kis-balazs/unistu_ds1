@@ -44,7 +44,7 @@ def user_interface():
 
     # ############################################################################################
     top = tkinter.Tk()
-    top.title("Chatter")
+    top.title("Chat Window")
 
     top.withdraw()
     nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:", parent=top)
