@@ -1,4 +1,5 @@
 import uuid
+import logging
 
 from scripts.message import Message
 from scripts.vectorclock import VectorClock
@@ -9,6 +10,7 @@ class Middleware:
     def __init__(self):
         self.vc = VectorClock()
         self.clients = {}
+        self.logger = logging.getLogger("middleware")
 
     @staticmethod
     def get():
@@ -18,7 +20,7 @@ class Middleware:
     
     def joinClient(self, conn):
         client = Client(conn)
-        self.clients[client.uuid] = client
+        self.clients[str(client.uuid)] = client
 
         if client.uuid not in self.vc.vcDictionary:
             self.vc.addParticipantToClock(client.uuid)
@@ -26,14 +28,22 @@ class Middleware:
         body = { 'uuid': str(client.uuid) }
         data = Message.encode(self.vc, 'join_cluster', True, body)
 
-        print("sending join_cluster")
+        self.logger.debug("Sending join_message")
         client.send(data)
         return client
+
+    def shutdown(self):
+        for client in self.clients.values():
+            client.closeConnection()
+
+    def clientDisconnected(self, client):
+        self.clients.pop(str(client.uuid))
 
 class Client:
     def __init__(self, conn):
         self.uuid = uuid.uuid4()
         self._conn = conn
+        self._logger = logging.getLogger("client<{}>".format(str(self.uuid)))
 
     def send(self, data):
         self._conn.send(data)
@@ -41,4 +51,15 @@ class Client:
     def receive(self, data):
         msg = Message.decode(data)
         if msg.type == 'send_text':
-            print('Client {} sent: {}'.format(str(self.uuid), msg.body))
+            self._logger.info('received text: {}'.format(msg.body))
+
+    def closeConnection(self):
+        Middleware.get().vc.increaseClock(self.uuid)
+        data = Message.encode(
+            Middleware.get().vc,
+            'server_close',
+            True,
+            None
+        )
+        self._conn.send(data)
+        self._conn.shutdown()

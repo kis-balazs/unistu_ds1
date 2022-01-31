@@ -4,6 +4,7 @@ import threading
 import socket
 import uuid
 import pickle
+import sys
 
 import discovery
 from scripts.message import Message
@@ -21,6 +22,7 @@ class Client(threading.Thread):
         self.onreceive = None
         self.vc = VectorClock()
         self.uuid = None
+        self._logger = logging.getLogger("client_thread")
 
     def run(self):
         self._sock = self._createSocket((self._primary, SERVER_PORT))
@@ -45,13 +47,15 @@ class Client(threading.Thread):
         elif msg.type == "send_text":
             if self.onreceive is not None:
                 self.onreceive(msg.body)
+        elif msg.type == "server_close":
+            self._logger.info("Server closed")
 
     def sendMessage(self, message):
         self.vc.increaseClock(self.uuid)
         self._sock.sendall(Message.encode(self.vc, 'send_text', True, message))
 
 # Run main
-logging.basicConfig(format='[%(asctime)s] [%(levelname)-05s] %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
 nickname = None
 while nickname == None:  

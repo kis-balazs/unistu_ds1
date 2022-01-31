@@ -9,8 +9,6 @@ class VectorClock:
             else:
                 assert copyDict is None
                 self.vcDictionary = {str(id): 0}
-        
-        print(self.vcDictionary)
 
     def increaseClock(self, id):
         self.vcDictionary[str(id)] += 1
