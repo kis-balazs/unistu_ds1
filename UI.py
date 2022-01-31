@@ -11,10 +11,11 @@ from client import Client
 
 logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
+client = None
+
+
 def user_interface():
     # ############################################################################################
-    client = None
-
     def receive(msg):
         msg_list.insert(tkinter.END, msg)
 
@@ -46,7 +47,7 @@ def user_interface():
 
     top = tkinter.Tk()
     top.title("Chatter")
-    
+
     messages_frame = tkinter.Frame(top)
     my_msg = tkinter.StringVar()  # For the messages to be sent.
     my_msg.set("Type your messages here.")
@@ -57,7 +58,7 @@ def user_interface():
     msg_list.pack(side=tkinter.LEFT, fill=tkinter.BOTH)
     msg_list.pack()
     messages_frame.pack()
-    
+
     entry_field = tkinter.Entry(top, textvariable=my_msg)
     entry_field.bind("<Return>", send)
     entry_field.pack()
