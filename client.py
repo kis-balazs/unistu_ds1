@@ -47,12 +47,14 @@ class Client(threading.Thread):
             self.vc = VectorClock(copyDict=msg.vc)
             self.uuid = uuid.UUID(msg.body['uuid'])  # todo make dot access to every sub-dict of dictionaries
         elif msg.type == "send_text":
+            self._logger.debug("receiving text: '{}'".format(msg.body))
             if self.onreceive is not None:
                 self.onreceive(msg.body)
         elif msg.type == "server_close":
             self._logger.info("Server closed")
 
     def sendMessage(self, message):
+        self._logger.debug("sending text: '{}'".format(message))
         self.vc.increaseClock(self.uuid)
         self._sock.sendall(Message.encode(self.vc, 'send_text', True, message))
 
