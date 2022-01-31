@@ -1,4 +1,5 @@
 import logging
+import sys
 import tkinter
 from threading import Thread
 from tkinter import messagebox
@@ -26,10 +27,10 @@ def user_interface():
             client.onreceive = receive
             client.start()
         else:
-            # alert
-            pass
+            messagebox.showerror('Error!', 'Server not available!')
+            sys.exit(1)
 
-    def send(a=None):
+    def send():
         global client
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         client.sendMessage("<{}> {}".format(client._nickname, my_msg.get()))
