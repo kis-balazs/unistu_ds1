@@ -4,34 +4,32 @@ import random
 from threading import Thread
 from tkinter import messagebox
  
+# def send():
+#     assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
+#     print('sending: {}'.format(my_msg.get()))
 
-def user_interface():
-    def send():
-        assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
-        print('sending: {}'.format(my_msg.get()))
-    
-    def on_closing():
-        """This function is to be called when the window is closed."""
-        assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
-        if messagebox.askokcancel("Quit", "Do you want to quit?"):
-            top.destroy()
-        my_msg.set("{quit}")
-        send()
-    
-    def receive():
-        """Handles receiving of messages."""
-        while True:
-            try:
-                sample_messages = ['Hello', 'Hi there!', 'Ceao bella!', 'Good day!']
-                sample_users = ['Giovanni', 'Mark', 'Paul', 'Jake']
-                msg = '{}: {}'.format(random.choice(sample_users), random.choice(sample_messages))
-                msg_list.insert(tkinter.END, msg)
-    
-                time.sleep(random.randint(1, 5))
-            except OSError:  # Possibly client has left the chat.
-                break
-    
-    
+# def on_closing():
+#     """This function is to be called when the window is closed."""
+#     assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
+#     if messagebox.askokcancel("Quit", "Do you want to quit?"):
+#         top.destroy()
+#     my_msg.set("{quit}")
+#     send()
+
+# def receive():
+#     """Handles receiving of messages."""
+#     while True:
+#         try:
+#             sample_messages = ['Hello', 'Hi there!', 'Ceao bella!', 'Good day!']
+#             sample_users = ['Giovanni', 'Mark', 'Paul', 'Jake']
+#             msg = '{}: {}'.format(random.choice(sample_users), random.choice(sample_messages))
+#             msg_list.insert(tkinter.END, msg)
+
+#             time.sleep(random.randint(1, 5))
+#         except OSError:  # Possibly client has left the chat.
+#             break
+
+def user_interface(send, receive, on_closing):
     top = tkinter.Tk()
     top.title("Chatter")
     
@@ -60,4 +58,4 @@ def user_interface():
     
 
 if __name__ == '__main__':
-    Thread(target=user_interface).start()
+    Thread(target=user_interface, args=(send, receive, on_closing)).start()
