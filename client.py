@@ -53,25 +53,3 @@ class Client(threading.Thread):
     def sendMessage(self, message):
         self.vc.increaseClock(self.uuid)
         self._sock.sendall(Message.encode(self.vc, 'send_text', True, message))
-
-# Run main
-logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
-
-nickname = None
-while nickname == None:  
-    nickname = input("\n Enter a nickname: ")
-
-def receive_message(msg):
-    print("\n" +msg)
-
-primary = discovery.find_primary()
-if primary is not None:
-    client = Client(primary, nickname)
-    client.onreceive = receive_message
-    client.start()
-
-    while True:
-        msg = input("> Enter message: ")
-        client.sendMessage(msg)
-else:
-    logging.error("No primary found")

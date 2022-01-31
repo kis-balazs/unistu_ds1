@@ -1,40 +1,43 @@
 import time
 import tkinter
 import random
+import logging
 from threading import Thread
 from tkinter import messagebox
 
+import discovery
+from client import Client
+
+logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
 def user_interface():
     # ############################################################################################
+    client = None
+
+    def receive(msg):
+        msg_list.insert(tkinter.END, msg)
+
     def init_client():
         # networking init
-        pass
+        primary = discovery.find_primary()
+        if primary is not None:
+            client = Client(primary, "nickname")
+            client.onreceive = receive
+            client.start()
+        else:
+            # alert
+            pass
 
     def send():
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
-        print('sending: {}'.format(my_msg.get()))
+        client.sendMessage(my_msg.get())
 
     def on_closing():
         """This function is to be called when the window is closed."""
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             top.destroy()
-        my_msg.set("{quit}")
-        send()
 
-    def receive():
-        """Handles receiving of messages."""
-        while True:
-            try:
-                sample_messages = ['Hello', 'Hi there!', 'Ceao bella!', 'Good day!']
-                sample_users = ['Giovanni', 'Mark', 'Paul', 'Jake']
-                msg = '{}: {}'.format(random.choice(sample_users), random.choice(sample_messages))
-                msg_list.insert(tkinter.END, msg)
-
-                time.sleep(random.randint(1, 5))
-            except OSError:  # Possibly client has left the chat.
-                break
     # ############################################################################################
     init_client()
 
@@ -60,8 +63,6 @@ def user_interface():
 
     top.protocol("WM_DELETE_WINDOW", on_closing)
     
-    receive_thread = Thread(target=receive)
-    receive_thread.start()
     tkinter.mainloop()  # Starts GUI execution.
 
 
