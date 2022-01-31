@@ -32,7 +32,8 @@ def user_interface():
     def send(a=None):
         global client
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
-        client.sendMessage("$> " + client._nickname + ": " + my_msg.get())
+        client.sendMessage("<{}> {}".format(client._nickname, my_msg.get()))
+        my_msg.set("")
 
     def on_closing():
         """This function is to be called when the window is closed."""
