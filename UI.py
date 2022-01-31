@@ -78,5 +78,3 @@ def user_interface():
 
 if __name__ == '__main__':
     Thread(target=user_interface).start()
-if __name__ == '__main__':
-    Thread(target=user_interface).start()

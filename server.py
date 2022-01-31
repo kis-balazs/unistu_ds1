@@ -147,13 +147,13 @@ class ClientConnection(threading.Thread):
         self._outQueue.put(data)
 
 
-# Run main
-logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
+if __name__ == '__main__':
+    logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
-server = Server()
+    server = Server()
 
-signal.signal(signal.SIGINT, lambda s, f: server.shutdown())
-signal.signal(signal.SIGTERM, lambda s, f: server.shutdown())
+    signal.signal(signal.SIGINT, lambda s, f: server.shutdown())
+    signal.signal(signal.SIGTERM, lambda s, f: server.shutdown())
 
-server.start()
-server.join()
+    server.start()
+    server.join()
