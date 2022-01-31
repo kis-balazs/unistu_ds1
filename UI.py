@@ -1,8 +1,5 @@
-from pydoc import cli
-import time
-import tkinter
-import random
 import logging
+import tkinter
 from threading import Thread
 from tkinter import messagebox
 
@@ -12,6 +9,7 @@ from client import Client
 logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
 client = None
+
 
 def user_interface():
     # ############################################################################################

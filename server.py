@@ -1,16 +1,15 @@
 #!/bin/python3
-import threading
 import logging
-import socket
-import signal
-import multiprocessing
 import select
+import signal
+import socket
+import threading
 
 import discovery
-from scripts.message import Message
 from scripts.middleware import Middleware
 
 SERVER_PORT = 5001
+
 
 class Server(threading.Thread):
     def __init__(self):
@@ -39,6 +38,7 @@ class Server(threading.Thread):
         self._clientListenerThread = ClientListener()
         self._clientListenerThread.start()
 
+
 class ClientListener(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
@@ -60,7 +60,7 @@ class ClientListener(threading.Thread):
     def shutdown(self):
         self._logger.info("stop accepting new connections")
         self._stopRequest = True
-            
+
     def _createSocket(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.bind(('', SERVER_PORT))
@@ -74,6 +74,7 @@ class ClientListener(threading.Thread):
 
         client_thread = ClientConnection(client_sock, client_address)
         client_thread.start()
+
 
 class ClientConnection(threading.Thread):
     def __init__(self, sock, address):
@@ -128,6 +129,7 @@ class ClientConnection(threading.Thread):
 
     def send(self, data):
         self._sock.sendall(data)
+
 
 # Run main
 logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)

@@ -1,15 +1,16 @@
 #!/bin/python3
 import logging
-import threading
-import socket
-import uuid
 import select
+import socket
+import threading
+import uuid
 
 from scripts.message import Message
 from scripts.vectorclock import VectorClock
 
 SERVER_PORT = 5001
 ACK_MSG = "ack"
+
 
 class Client(threading.Thread):
     def __init__(self, address, nickname):

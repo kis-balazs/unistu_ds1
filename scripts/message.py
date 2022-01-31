@@ -1,5 +1,7 @@
 import pickle
+
 from scripts.vectorclock import VectorClock
+
 
 class Message:
     # in-class class to access the decode message's fields using dot notation
@@ -35,7 +37,7 @@ if __name__ == '__main__':
     vc = VectorClock(1)
 
     y = Message.encode(vc, 'text_message', True, 'hi')
-    
+
     x = Message.decode(y)
     print(x.type)
     print(x.body)

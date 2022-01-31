@@ -1,7 +1,7 @@
-import socket
 import logging
-from threading import Thread
 import multiprocessing
+import socket
+from threading import Thread
 
 DISCOVERY_PORT = 37020
 
@@ -10,9 +10,10 @@ WHOIS_RES = 'whois_primary_res'
 
 discovery_logger = logging.getLogger("discovery")
 
+
 def find_primary():
     discovery_logger.info('Starting discovery process')
-    broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #UDP
+    broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
     broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     broadcast_socket.settimeout(5)
 
@@ -33,6 +34,7 @@ def find_primary():
 
     return None
 
+
 class DiscoveryServerThread(Thread):
     def __init__(self):
         Thread.__init__(self)
@@ -40,7 +42,7 @@ class DiscoveryServerThread(Thread):
         self._logger = logging.getLogger("discovery_server")
 
     def run(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #UDP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.settimeout(5)
@@ -58,7 +60,7 @@ class DiscoveryServerThread(Thread):
                     continue
         finally:
             sock.close()
-        
+
     def terminate(self):
         self._stopEvent.set()
 

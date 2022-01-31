@@ -1,8 +1,9 @@
-import uuid
 import logging
+import uuid
 
 from scripts.message import Message
 from scripts.vectorclock import VectorClock
+
 
 class Middleware:
     __INSTANCE__ = None
@@ -17,7 +18,7 @@ class Middleware:
         if Middleware.__INSTANCE__ is None:
             Middleware.__INSTANCE__ = Middleware()
         return Middleware.__INSTANCE__
-    
+
     def joinClient(self, conn):
         client = Client(conn)
         self.clients[str(client.uuid)] = client
@@ -25,7 +26,7 @@ class Middleware:
         if client.uuid not in self.vc.vcDictionary:
             self.vc.addParticipantToClock(client.uuid)
 
-        body = { 'uuid': str(client.uuid) }
+        body = {'uuid': str(client.uuid)}
         data = Message.encode(self.vc, 'join_cluster', True, body)
 
         self.logger.debug("Sending join_message")
@@ -44,6 +45,7 @@ class Middleware:
         for client in self.clients.values():
             data = Message.encode(self.vc, 'send_text', True, message)
             client.send(data)
+
 
 class Client:
     def __init__(self, conn):

@@ -1,5 +1,5 @@
-import socket
 import logging
+import socket
 from threading import Thread
 
 DISCOVERY_PORT = 37020
@@ -7,9 +7,10 @@ DISCOVERY_PORT = 37020
 WHOIS_REQ = 'whois_primary_req'
 WHOIS_RES = 'whois_primary_res'
 
+
 def find_primary():
     logging.info('discovery: Starting discovery process')
-    broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #UDP
+    broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
     broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     broadcast_socket.settimeout(5)
 
@@ -36,7 +37,7 @@ class DiscoveryServerThread(Thread):
         self.running = True
 
     def run(self):
-        listen_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #UDP
+        listen_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listen_socket.settimeout(5)
@@ -54,13 +55,13 @@ class DiscoveryServerThread(Thread):
                     continue
         finally:
             listen_socket.close()
-        
+
     def terminate(self):
         self.running = False
-		
+
 
 if __name__ == '__main__':
-	logging.basicConfig(format='[%(asctime)s] [%(levelname)-05s] %(message)s', level=logging.DEBUG)
-	ds = DiscoveryServerThread()
-	ds.start()
-	ds.join()
+    logging.basicConfig(format='[%(asctime)s] [%(levelname)-05s] %(message)s', level=logging.DEBUG)
+    ds = DiscoveryServerThread()
+    ds.start()
+    ds.join()
