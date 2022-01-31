@@ -1,5 +1,5 @@
 import pickle
-import logging
+
 from scripts.vectorclock import VectorClock
 
 
@@ -9,7 +9,7 @@ class Message:
         __getattr__ = dict.get
 
     @staticmethod
-    def encode(vc: VectorClock, type: str, success: bool, msg: str) -> None:
+    def encode(vc: VectorClock, type: str, success: bool, msg) -> bytes:
         # serialize the message together with the vector clock
         json_data = {
             'vc': vc.vcDictionary,
