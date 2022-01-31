@@ -2,6 +2,7 @@ import logging
 import tkinter
 from threading import Thread
 from tkinter import messagebox
+import tkinter.simpledialog
 
 import discovery
 from client import Client
@@ -16,12 +17,12 @@ def user_interface():
     def receive(msg):
         msg_list.insert(tkinter.END, msg)
 
-    def init_client():
+    def init_client(nickname):
         global client
         # networking init
         primary = discovery.find_primary()
         if primary is not None:
-            client = Client(primary, "nickname")
+            client = Client(primary, nickname)
             client.onreceive = receive
             client.start()
         else:
@@ -31,7 +32,7 @@ def user_interface():
     def send(a=None):
         global client
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
-        client.sendMessage(my_msg.get())
+        client.sendMessage("$> " + client._nickname + ": " + my_msg.get())
 
     def on_closing():
         """This function is to be called when the window is closed."""
@@ -41,7 +42,11 @@ def user_interface():
             client.shutdown()
 
     # ############################################################################################
-    init_client()
+    nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:")
+    if nickname:
+        init_client(nickname)
+    else:
+        return
 
     top = tkinter.Tk()
     top.title("Chatter")
