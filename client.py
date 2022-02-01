@@ -62,9 +62,10 @@ class Client(threading.Thread):
             self._logger.info("Server closed")
             if self.onreceive is not None:
                 self.onreceive('$> server disconnected...')
+
+        assert self.vc.vcDictionary == msg.vc
         from pprint import pprint
         print('####')
-        pprint(msg.vc)
         pprint(self.vc.vcDictionary)
         print('####')
 
