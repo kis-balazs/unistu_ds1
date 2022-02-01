@@ -10,11 +10,14 @@ class VectorClock:
                 assert copyDict is None
                 self.vcDictionary = {str(id): 0}
 
-    def increaseClock(self, id):
-        self.vcDictionary[str(id)] += 1
+    def __delitem__(self, key):
+        del self.vcDictionary[key]
 
-    def addParticipantToClock(self, id):
-        self.vcDictionary[str(id)] = 0
+    def increaseClock(self, key):
+        self.vcDictionary[str(key)] += 1
+
+    def addParticipantToClock(self, key):
+        self.vcDictionary[str(key)] = 0
 
     def printClock(self):
         print("\n[VECTORCLOCK]: ", str(self.vcDictionary))

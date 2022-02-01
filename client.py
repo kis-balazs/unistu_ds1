@@ -47,6 +47,14 @@ class Client(threading.Thread):
             self.vc = VectorClock(copyDict=msg.vc)
             self.uuid = uuid.UUID(msg.body.uuid)
         elif msg.type == "send_text":
+            # consolidate server's view with local view on vector clocks
+            new_vc = {}
+            for k, v in msg.vc.items():
+                if k == str(self.uuid):  # if it's the current client in the vector clock, compare event number
+                    assert self.vc.vcDictionary[str(self.uuid)] == msg.vc[str(self.uuid)]
+                new_vc[k] = v
+            self.vc = VectorClock(copyDict=new_vc)
+
             self._logger.debug("receiving text: '{}'".format(msg.body))
             if self.onreceive is not None:
                 self.onreceive(msg.body)
@@ -54,6 +62,11 @@ class Client(threading.Thread):
             self._logger.info("Server closed")
             if self.onreceive is not None:
                 self.onreceive('$> server disconnected...')
+        from pprint import pprint
+        print('####')
+        pprint(msg.vc)
+        pprint(self.vc.vcDictionary)
+        print('####')
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))

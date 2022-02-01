@@ -39,6 +39,7 @@ class Middleware:
 
     def clientDisconnected(self, client):
         self.clients.pop(str(client.uuid))
+        del self.vc[str(client.uuid)]
 
     def newMessage(self, send_client, message):
         self.vc.increaseClock(send_client.uuid)
