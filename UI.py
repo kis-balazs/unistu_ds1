@@ -1,9 +1,9 @@
-import sys
 import logging
+import sys
 import tkinter
+import tkinter.simpledialog
 from threading import Thread
 from tkinter import messagebox
-import tkinter.simpledialog
 
 import discovery
 from client import Client
@@ -16,7 +16,13 @@ client = None
 def user_interface():
     # ############################################################################################
     def receive(msg):
-        msg_list.insert(tkinter.END, msg)
+        if isinstance(msg, str):
+            msg_list.insert(tkinter.END, msg)
+        elif isinstance(msg, list):
+            for mg in msg:
+                msg_list.insert(tkinter.END, mg)
+        else:
+            raise NotImplementedError('received messages by send_test | history can be only string | list!')
 
     def init_client(nickname):
         global client

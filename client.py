@@ -46,7 +46,7 @@ class Client(threading.Thread):
         if msg.type == "join_cluster":
             self.vc = VectorClock(copyDict=msg.vc)
             self.uuid = uuid.UUID(msg.body.uuid)
-        elif msg.type == "send_text":
+        elif msg.type in ["send_text", "history"]:
             # consolidate server's view with local view on vector clocks
             new_vc = {}
             for k, v in msg.vc.items():
@@ -55,7 +55,10 @@ class Client(threading.Thread):
                 new_vc[k] = v
             self.vc = VectorClock(copyDict=new_vc)
 
-            self._logger.debug("receiving text: '{}'".format(msg.body))
+            if msg.type == 'send_text':
+                self._logger.debug("receiving text: '{}'".format(msg.body))
+            elif msg.type == 'history':
+                self._logger.debug("receiving history of conversation from server!")
             if self.onreceive is not None:
                 self.onreceive(msg.body)
         elif msg.type == "server_close":
@@ -64,10 +67,10 @@ class Client(threading.Thread):
                 self.onreceive('$> server disconnected...')
 
         assert self.vc.vcDictionary == msg.vc
-        from pprint import pprint
-        print('####')
-        pprint(self.vc.vcDictionary)
-        print('####')
+        # from pprint import pprint
+        # print('####')
+        # pprint(self.vc.vcDictionary)
+        # print('####')
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))

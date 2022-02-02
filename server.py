@@ -1,10 +1,10 @@
 #!/bin/python3
 import logging
+import queue
 import select
 import signal
 import socket
 import threading
-import queue
 
 import discovery
 from scripts.middleware import Middleware
@@ -49,7 +49,6 @@ class ClientListener(threading.Thread):
 
     def run(self):
         self._createSocket()
-
         try:
             while not self._stopRequest:
                 ready = select.select([self._sock], [], [], 0.5)
@@ -84,7 +83,7 @@ class ClientConnection(threading.Thread):
         self._sock = sock
         self._address = address
         self._client = None
-        self._logger = logging.getLogger("client_conn<{}>".format(self._address[0]))
+        self._logger = logging.getLogger("client_conn<{}>".format(self._address[0]))  # todo rather use uuid?
         self._outQueue = queue.Queue(maxsize=1024)
 
     def run(self):
