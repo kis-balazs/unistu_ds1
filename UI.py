@@ -50,11 +50,12 @@ def user_interface():
 
     # ############################################################################################
     top = tkinter.Tk()
-    top.title("Chat Window")
+    top.title("DS Chat")
 
     top.withdraw()
     nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:", parent=top)
     if nickname:
+        top.title("DS Chat - " + nickname)
         init_client(nickname)
         top.deiconify()
     else:
