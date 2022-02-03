@@ -18,9 +18,22 @@ class Server(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self._discoveryThread = None
+        self._primary = None
         self._logger = logging.getLogger("server")
 
     def run(self):
+        self._logger.info("Searching for primary...")
+        self._primary = discovery.find_primary()
+        if self._primary is None:
+            self._logger.info("No primary found. Promoting self.")
+            # We will become primary
+            self.promote()
+        else: 
+            # Start in replica mode
+            self._logger.info("Primary found at {}. Starting in replica mode.".format(self._primary))
+            self.demote()
+
+    def promote(self):
         self._startDiscoveryThread()
         self._startClientListenerThread()
         self._startReplicaListenerThread()
@@ -29,11 +42,18 @@ class Server(threading.Thread):
         self._clientListenerThread.join()
         self._discoveryThread.join()
 
+    def demote(self):
+        self._startReplicaThread()
+        self._replicaThread.join()
+
     def shutdown(self):
         self._logger.info("shutting down...")
-        self._discoveryThread.terminate()
-        self._clientListenerThread.shutdown()
-        self._replicaListenerThread.shutdown()
+        if self._primary is None:
+            self._discoveryThread.terminate()
+            self._clientListenerThread.shutdown()
+            self._replicaListenerThread.shutdown()
+        else:
+            self._replicaThread.shutdown()
         Middleware.get().shutdown()
 
     def _startDiscoveryThread(self):
@@ -45,8 +65,12 @@ class Server(threading.Thread):
         self._clientListenerThread.start()
 
     def _startReplicaListenerThread(self):
-        self._replicaListenerThread = ConnectionListener("replica_listener", REPLCIA_PORT, ReplicaConnection)
+        self._replicaListenerThread = ConnectionListener("replica_listener", REPLCIA_PORT, ReplicaServerConnection)
         self._replicaListenerThread.start()
+
+    def _startReplicaThread(self):
+        self._replicaThread = ReplicaClientConnection((self._primary, REPLCIA_PORT))
+        self._replicaThread.start()
 
 
 class ConnectionListener(threading.Thread):
@@ -113,7 +137,7 @@ class Connection(threading.Thread):
     def onOpen(self):
         pass
 
-    def onData(self):
+    def onData(self, data):
         pass
 
     def onClose(self):
@@ -177,20 +201,39 @@ class ClientConnection(Connection):
         Middleware.get().clientDisconnected(self._client)
 
 
-class ReplicaConnection(Connection):
+class ReplicaServerConnection(Connection):
     def __init__(self, sock, address):
         Connection.__init__(self, sock, address, "replica_conn<{}>".format(address[0]))
         self._replica = None
 
     def onOpen(self):
+        self._replica = Middleware.get().joinReplica(self)
+
+    def onData(self, data):
+        self._replica.receive(data)
+
+    def onClose(self):
+        Middleware.get().replicaDisconnected(self._replica)
+
+
+class ReplicaClientConnection(Connection):
+    def __init__(self, primary):
+        Connection.__init__(self, self._createSocket(primary), primary, "replica_client_conn")
+        self._replica = None
+
+    def onOpen(self):
         self._logger.debug("replica onOpen")
 
-    def onData(self):
-        self._logger.debug("replica onData")
+    def onData(self, data):
+        self._logger.debug("replica onData: " + data.decode("UTF-8"))
 
     def onClose(self):
         self._logger.debug("replica onClose")
 
+    def _createSocket(self, address):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(address)
+        return sock
 
 if __name__ == '__main__':
     logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)

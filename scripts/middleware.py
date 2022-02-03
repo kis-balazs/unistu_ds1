@@ -70,6 +70,7 @@ class Middleware:
         self.vc = VectorClock()
         self.history = History()
         self.clients = {}
+        self.replicas = {}
         self.logger = logging.getLogger("middleware")
 
     @staticmethod
@@ -99,13 +100,27 @@ class Middleware:
             client.send(data)
         return client
 
+    def joinReplica(self, conn):
+        self.logger.debug("Joining replica into cluster")
+        replica = Replica(conn)
+        self.replicas[str(replica.uuid)] = replica
+
+        replica.send("Hello World!".encode("UTF-8"))
+
+        return replica
+
     def shutdown(self):
         for client in self.clients.values():
             client.closeConnection()
+        for replica in self.replicas.values():
+            replica.closeConnection()
 
     def clientDisconnected(self, client):
         self.clients.pop(str(client.uuid))
         del self.vc[str(client.uuid)]
+
+    def replicaDisconnected(self, replica):
+        self.replicas.pop(str(replica.uuid))
 
     def newMessage(self, send_client, message):
         self.history.on_new_message(message, send_client)
@@ -139,4 +154,19 @@ class Client:
             None
         )
         self._conn.send(data)
+        self._conn.shutdown()
+
+class Replica:
+    def __init__(self, conn):
+        self.uuid = uuid.uuid4()
+        self._conn = conn
+        self._logger = logging.getLogger("replica<{}>".format(str(self.uuid)))
+
+    def send(self, data):
+        self._conn.send(data)
+
+    def receive(self, data):
+        self._logger.info("received data: " + data.decode("UTF-8"))
+
+    def closeConnection(self):
         self._conn.shutdown()
