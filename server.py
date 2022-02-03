@@ -193,6 +193,7 @@ class ClientConnection(Connection):
 
     def onOpen(self):
         self._client = Middleware.get().joinClient(self)
+        self._logger = logging.getLogger("client_conn<{}>".format(str(self._client.uuid)))
 
     def onData(self, data):
         self._client.receive(data)
@@ -208,6 +209,7 @@ class ReplicaServerConnection(Connection):
 
     def onOpen(self):
         self._replica = Middleware.get().joinReplica(self)
+        self._logger = logging.getLogger("replica_conn<{}>".format(str(self._replica.uuid)))
 
     def onData(self, data):
         self._replica.receive(data)
