@@ -188,7 +188,7 @@ class Connection(threading.Thread):
 
 class ClientConnection(Connection):
     def __init__(self, sock, address):
-        Connection.__init__(self, sock, address, "client_conn<{}>".format(address[0]))
+        Connection.__init__(self, sock, address, "client_conn<{}:{}>".format(address[0], str(address[1])))
         self._client = None
 
     def onOpen(self):
@@ -203,7 +203,7 @@ class ClientConnection(Connection):
 
 class ReplicaServerConnection(Connection):
     def __init__(self, sock, address):
-        Connection.__init__(self, sock, address, "replica_conn<{}>".format(address[0]))
+        Connection.__init__(self, sock, address, "replica_conn<{}:{}>".format(address[0], str(address[1])))
         self._replica = None
 
     def onOpen(self):
