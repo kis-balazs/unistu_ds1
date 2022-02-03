@@ -8,10 +8,13 @@ from scripts.vectorclock import VectorClock
 class History:
     def __init__(self):
         self._history = []
+        self._backlog = []
 
-    def on_new_message(self, msg):
+    def on_new_message(self, msg, sender):
         server_view_vc = Middleware.get().vc.vcDictionary
         client_view_vc = msg.vc
+        _backlog_object = None
+        _append_to_history_index = None
 
         for k, v in server_view_vc.items():
             # already received past message
@@ -19,14 +22,45 @@ class History:
                 pass
             # the exactly next message, just add to history
             elif client_view_vc[k] == server_view_vc[k] + 1:
-                self._history.append(msg.body)
-                # here gets the server view updated!
-                server_view_vc[k] += 1
+                if str(sender.uuid) == k:
+                    _append_to_history_index = k
+                else:
+                    _backlog_object = (msg, sender)
             else:
-                print('! Houston we have a problem')  # todo solve this
+                _backlog_object = (msg, sender)
+
+        if _backlog_object:
+            self._backlog.append(_backlog_object)
+        elif _append_to_history_index is not None:
+            self._history.append(msg.body)
+            server_view_vc[_append_to_history_index] += 1
+            self.try_pop_backlog(msg, _append_to_history_index)
+        else:
+            raise Exception('message has to be appended either in backlog or in history!')
 
     def get_history(self):
         return self._history
+
+    def try_pop_backlog(self, msg, sender_uuid):
+        if not self._backlog:
+            return
+
+        elem_to_pop = None
+
+        for bmsg, bsender in self._backlog:
+            for k, v in bmsg.vc:
+                if bmsg.vc[k] <= msg.vc[k]:
+                    pass
+                elif bmsg.vc[k] == msg.vc[k] + 1:
+                    if k == sender_uuid:
+                        elem_to_pop = (bmsg, bsender)
+                else:
+                    elem_to_pop = None
+
+        if elem_to_pop:
+            self._backlog.remove(elem_to_pop)
+            # append to history
+            self._history.append(elem_to_pop[0])
 
 
 class Middleware:
@@ -74,9 +108,8 @@ class Middleware:
         del self.vc[str(client.uuid)]
 
     def newMessage(self, send_client, message):
-        self.history.on_new_message(message)
-        # already increased in collecting in history
-        # self.vc.increaseClock(send_client.uuid)
+        self.history.on_new_message(message, send_client)
+
         for client in self.clients.values():
             data = Message.encode(self.vc, 'send_text', True, message.body)
             client.send(data)
