@@ -25,7 +25,7 @@ class Client(threading.Thread):
         self._stopRequest = False
 
     def run(self):
-        self._sock = self._createSocket((self._primary, SERVER_PORT))
+        self._sock = self._createSocket(self._primary)
         try:
             while not self._stopRequest:
                 ready = select.select([self._sock], [], [], 0.5)

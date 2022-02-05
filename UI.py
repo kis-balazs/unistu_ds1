@@ -29,7 +29,7 @@ def user_interface():
         # networking init
         primary = discovery.find_primary()
         if primary is not None:
-            client = Client(primary, nickname)
+            client = Client(primary.serverAddress(), nickname)
             client.onreceive = receive
             client.start()
         else:

@@ -10,6 +10,20 @@ WHOIS_RES = 'whois_primary_res'
 
 discovery_logger = logging.getLogger("discovery")
 
+class PrimaryInfo:
+    def __init__(self, ip, server_port, replica_port):
+        self.ip = ip
+        self.server_port = server_port
+        self.replica_port = replica_port
+
+    def __str__(self):
+        return "ip={} server_port={} replica_port={}".format(self.ip, self.server_port, self.replica_port)
+
+    def serverAddress(self):
+        return self.ip, self.server_port
+
+    def replicaAddress(self):
+        return self.ip, self.replica_port
 
 def find_primary():
     discovery_logger.info('Starting discovery process')
@@ -24,9 +38,13 @@ def find_primary():
 
         # Receive response
         data, address = broadcast_socket.recvfrom(1024)
-        if data.decode('UTF-8') == WHOIS_RES:
-            discovery_logger.info('Received primary address: ' + str(address))
-            return address[0]
+        msg = data.decode('UTF-8').split()
+        if len(msg) != 3:
+            return None
+        if msg[0] == WHOIS_RES:
+            primary = PrimaryInfo(ip=address[0], server_port=int(msg[1]), replica_port=int(msg[2]))
+            discovery_logger.info('Received primary address: {}'.format(str(primary)))
+            return primary
     except socket.timeout:
         discovery_logger.debug('Timed out')
     finally:
@@ -36,10 +54,12 @@ def find_primary():
 
 
 class DiscoveryServerThread(Thread):
-    def __init__(self):
+    def __init__(self, server_port, replica_port):
         Thread.__init__(self)
         self._stopEvent = multiprocessing.Event()
         self._logger = logging.getLogger("discovery_server")
+        self._server_port = server_port
+        self._replica_port = replica_port
 
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
@@ -55,7 +75,7 @@ class DiscoveryServerThread(Thread):
                     data, address = sock.recvfrom(1024)
                     if data.decode('UTF-8') == WHOIS_REQ:
                         self._logger.debug('Received request from ' + str(address))
-                        sock.sendto(WHOIS_RES.encode('UTF-8'), address)
+                        sock.sendto("{} {} {}".format(WHOIS_RES, self._server_port, self._replica_port).encode('UTF-8'), address)
                 except socket.timeout:
                     continue
         finally:

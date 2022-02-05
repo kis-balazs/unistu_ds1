@@ -6,6 +6,8 @@ import signal
 import socket
 import threading
 import traceback
+import sys
+import getopt
 
 import discovery
 from scripts.middleware import Middleware
@@ -15,11 +17,13 @@ REPLCIA_PORT = 5002
 
 
 class Server(threading.Thread):
-    def __init__(self):
+    def __init__(self, server_port, replica_port):
         threading.Thread.__init__(self)
         self._discoveryThread = None
         self._primary = None
         self._logger = logging.getLogger("server")
+        self._server_port = server_port
+        self._replica_port = replica_port
 
     def run(self):
         self._logger.info("Searching for primary...")
@@ -30,7 +34,7 @@ class Server(threading.Thread):
             self.promote()
         else: 
             # Start in replica mode
-            self._logger.info("Primary found at {}. Starting in replica mode.".format(self._primary))
+            self._logger.info("Primary found. Starting in replica mode.".format())
             self.demote()
 
     def promote(self):
@@ -57,19 +61,19 @@ class Server(threading.Thread):
         Middleware.get().shutdown()
 
     def _startDiscoveryThread(self):
-        self._discoveryThread = discovery.DiscoveryServerThread()
+        self._discoveryThread = discovery.DiscoveryServerThread(self._server_port, self._replica_port)
         self._discoveryThread.start()
 
     def _startClientListenerThread(self):
-        self._clientListenerThread = ConnectionListener("client_listener", SERVER_PORT, ClientConnection)
+        self._clientListenerThread = ConnectionListener("client_listener", self._server_port, ClientConnection)
         self._clientListenerThread.start()
 
     def _startReplicaListenerThread(self):
-        self._replicaListenerThread = ConnectionListener("replica_listener", REPLCIA_PORT, ReplicaServerConnection)
+        self._replicaListenerThread = ConnectionListener("replica_listener", self._replica_port, ReplicaServerConnection)
         self._replicaListenerThread.start()
 
     def _startReplicaThread(self):
-        self._replicaThread = ReplicaClientConnection((self._primary, REPLCIA_PORT))
+        self._replicaThread = ReplicaClientConnection(self._primary)
         self._replicaThread.start()
 
 
@@ -224,8 +228,9 @@ class ReplicaServerConnection(Connection):
 
 class ReplicaClientConnection(Connection):
     def __init__(self, primary):
-        Connection.__init__(self, self._createSocket(primary), primary, "replica_client_conn")
+        Connection.__init__(self, self._createSocket(primary.replicaAddress()), primary.replicaAddress(), "replica_client_conn")
         self._replica = None
+        self._primary = primary
 
     def onOpen(self):
         self._logger.debug("replica onOpen")
@@ -246,7 +251,23 @@ class ReplicaClientConnection(Connection):
 if __name__ == '__main__':
     logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
-    server = Server()
+    server_port = SERVER_PORT
+    replica_port = REPLCIA_PORT
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 's:r:', ['server-port=', 'replica-port='])
+        for o, a in opts:
+            if o in ('-s', '--server-port'):
+                server_port = int(a)
+            elif o in ('-r', '--replica-port'):
+                replica_port = int(a)
+    except getopt.GetoptError:
+        print("Invalid arguments")
+        sys.exit(1)
+    except:
+        print("Failed to parse arguments")
+        sys.exit(1)
+
+    server = Server(server_port, replica_port)
 
     signal.signal(signal.SIGINT, lambda s, f: server.shutdown())
     signal.signal(signal.SIGTERM, lambda s, f: server.shutdown())
