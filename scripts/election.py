@@ -21,6 +21,8 @@ class LCR:
 
         self._logger.debug('Participant is up and ready to run LCR at {}:{}'.format(address[0], address[1]))
 
+        # get neighbor address in the formed ring
+        assert self._ring
         self._neighbor_address = self.get_neighbour(self._my_uuid)
 
     @staticmethod
