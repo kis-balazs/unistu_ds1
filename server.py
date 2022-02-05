@@ -14,16 +14,17 @@ from scripts.middleware import Middleware
 
 SERVER_PORT = 5001
 REPLCIA_PORT = 5002
-
+ELECTION_PORT = 5003
 
 class Server(threading.Thread):
-    def __init__(self, server_port, replica_port):
+    def __init__(self, server_port, replica_port, election_port):
         threading.Thread.__init__(self)
         self._discoveryThread = None
         self._primary = None
         self._logger = logging.getLogger("server")
         self._server_port = server_port
         self._replica_port = replica_port
+        self._election_port = election_port
 
     def run(self):
         self._logger.info("Searching for primary...")
@@ -41,6 +42,10 @@ class Server(threading.Thread):
         self._startDiscoveryThread()
         self._startClientListenerThread()
         self._startReplicaListenerThread()
+
+        own_host = socket.gethostname()
+        own_ip = socket.gethostbyname(own_host)
+        Middleware.get().onPrimaryStart((own_ip, self._election_port))
 
         self._replicaListenerThread.join()
         self._clientListenerThread.join()
@@ -73,7 +78,7 @@ class Server(threading.Thread):
         self._replicaListenerThread.start()
 
     def _startReplicaThread(self):
-        self._replicaThread = ReplicaClientConnection(self._primary)
+        self._replicaThread = ReplicaClientConnection(self._primary, self._election_port)
         self._replicaThread.start()
 
 
@@ -216,7 +221,7 @@ class ReplicaServerConnection(Connection):
         self._replica = None
 
     def onOpen(self):
-        self._replica = Middleware.get().joinReplica(self)
+        self._replica = Middleware.get().createReplica(self)
         self._logger = logging.getLogger("replica_conn<{}>".format(str(self._replica.uuid)))
 
     def onData(self, data):
@@ -227,14 +232,15 @@ class ReplicaServerConnection(Connection):
 
 
 class ReplicaClientConnection(Connection):
-    def __init__(self, primary):
+    def __init__(self, primary, election_port):
         Connection.__init__(self, self._createSocket(primary.replicaAddress()), primary.replicaAddress(), "replica_client_conn")
         self._replica = None
         self._primary = primary
+        self._election_port = election_port
 
     def onOpen(self):
         self._logger.debug("replica onOpen")
-        Middleware.get().replicaOpen(self)
+        Middleware.get().replicaOpen(self, self._election_port)
 
     def onData(self, data):
         Middleware.get().replicaReceive(data)
@@ -253,13 +259,16 @@ if __name__ == '__main__':
 
     server_port = SERVER_PORT
     replica_port = REPLCIA_PORT
+    election_port = ELECTION_PORT
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 's:r:', ['server-port=', 'replica-port='])
+        opts, args = getopt.getopt(sys.argv[1:], 's:r:e:', ['server-port=', 'replica-port=', 'election_port='])
         for o, a in opts:
             if o in ('-s', '--server-port'):
                 server_port = int(a)
             elif o in ('-r', '--replica-port'):
                 replica_port = int(a)
+            elif o in ('-e', '--election-port'):
+                election_port = int(a)
     except getopt.GetoptError:
         print("Invalid arguments")
         sys.exit(1)
@@ -267,7 +276,7 @@ if __name__ == '__main__':
         print("Failed to parse arguments")
         sys.exit(1)
 
-    server = Server(server_port, replica_port)
+    server = Server(server_port, replica_port, election_port)
 
     signal.signal(signal.SIGINT, lambda s, f: server.shutdown())
     signal.signal(signal.SIGTERM, lambda s, f: server.shutdown())
