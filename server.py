@@ -1,11 +1,11 @@
 #!/bin/python3
-from concurrent.futures import thread
 import logging
 import queue
 import select
 import signal
 import socket
 import threading
+import traceback
 
 import discovery
 from scripts.middleware import Middleware
@@ -127,12 +127,16 @@ class Connection(threading.Thread):
             self._eventLoop()
         except Exception as e:
             self._logger.error("Some error: " + str(e))
+            traceback.print_exc()
         finally:
             self._sock.close()
             self._logger.debug("Connection closed")
 
     def shutdown(self):
         self._stopRequest = True
+
+    def getAddress(self):
+        return self._address
 
     def onOpen(self):
         pass
@@ -225,12 +229,14 @@ class ReplicaClientConnection(Connection):
 
     def onOpen(self):
         self._logger.debug("replica onOpen")
+        Middleware.get().replicaOpen(self)
 
     def onData(self, data):
-        self._logger.debug("replica onData: " + data.decode("UTF-8"))
+        Middleware.get().replicaReceive(data)
 
     def onClose(self):
         self._logger.debug("replica onClose")
+        Middleware.get().replicaClose()
 
     def _createSocket(self, address):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

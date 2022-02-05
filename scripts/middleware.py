@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import logging
 import uuid
 
@@ -69,8 +70,11 @@ class Middleware:
     def __init__(self):
         self.vc = VectorClock()
         self.history = History()
+        self.uuid = None
         self.clients = {}
         self.replicas = {}
+        self.replicaPeerAddresses = {}
+        self.replicaConn = None
         self.logger = logging.getLogger("middleware")
 
     @staticmethod
@@ -100,14 +104,47 @@ class Middleware:
             client.send(data)
         return client
 
+    def replicaOpen(self, conn):
+        self.replicaConn = conn
+
+    def replicaReceive(self, data):
+        msg = Message.decode(data)
+        self.logger.debug("received message '{}'".format(msg.type))
+        if msg.type == 'join_replica':
+            self.newReplicaPeer(msg.body)
+
+    def replicaSend(self, data):
+        self.replicaConn.send(data)
+
+    def replicaClose(self):
+        # TODO: re-election
+        pass
+
     def joinReplica(self, conn):
         self.logger.debug("Joining replica into cluster")
         replica = Replica(conn)
+        
+        self.logger.debug("Accepting replica {}, sending 'join_replica'".format(str(replica.uuid)))
         self.replicas[str(replica.uuid)] = replica
-
-        replica.send("Hello World!".encode("UTF-8"))
-
+        msg = Message.encode(self.vc, 'join_replica', True, {
+            'uuid': str(replica.uuid),
+            'replicas': [
+                {
+                    'uuid': str(v.uuid),
+                    'address': v.getAddress()
+                } 
+                for v in self.replicas.values()
+            ],
+        })
+        for r in self.replicas.values():
+            r.send(msg)
+        
         return replica
+
+    def newReplicaPeer(self, body):
+        if str(self.uuid) == body.uuid:
+            self.logger.info("Accepted into cluster")
+        self.logger.debug("Replicas: {}".format(str(body.replicas)))
 
     def shutdown(self):
         for client in self.clients.values():
@@ -166,7 +203,10 @@ class Replica:
         self._conn.send(data)
 
     def receive(self, data):
-        self._logger.info("received data: " + data.decode("UTF-8"))
+        msg = Message.decode(data)
 
     def closeConnection(self):
         self._conn.shutdown()
+
+    def getAddress(self):
+        return self._conn.getAddress()[0]
