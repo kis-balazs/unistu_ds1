@@ -3,6 +3,8 @@ import socket
 import time
 import uuid
 import logging
+import select
+import queue
 from threading import Thread
 
 
@@ -17,10 +19,13 @@ class LCR:
         self._participant = None
 
         self._logger.info(str(self._ring))
+        self._stopRequest = False
 
         self._ring_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         address = self.__uuid_to_address[self._my_uuid]
         self._ring_socket.bind(address)
+        self._ring_socket.setblocking(0)
+        self._outQueue = queue.Queue(maxsize=1024)
 
         self._logger.debug('Participant is up and ready to run LCR at {}:{}'.format(address[0], address[1]))
 
@@ -61,34 +66,64 @@ class LCR:
         return self.__uuid_to_address[ret_entry]
 
     def run(self):
-        while True:
-            data, address = self._ring_socket.recvfrom(1024)
-            election_message = json.loads(data.decode('UTF-8'))
+        outputs = []
 
-            if election_message['isLeader']:
-                self.__on_leader_election(election_message['mid'])
-                # forward received election message to left neighbour
-                if election_message['mid'] != self._my_uuid:
-                    self._participant = False
-                    self._ring_socket.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+        while not self._stopRequest or not self._outQueue.empty():
+            readable, writable, exceptional = select.select([self._ring_socket], outputs, [], 0.5)
+            if self._ring_socket in readable and not self._stopRequest:
+                data, address = self._ring_socket.recvfrom(1024)
+                if data:
+                    self.onData(data)
+
+            if not self._outQueue.empty():
+                outputs = [self._ring_socket]
             else:
-                if election_message['mid'] < self._my_uuid and not self._participant:
-                    new_election_message = {
-                        "mid": self._my_uuid,
-                        "isLeader": False
-                    }
-                    self._participant = True
-                    # send received election message to left neighbour
-                    self._ring_socket.sendto(json.dumps(new_election_message).encode('UTF-8'), self._neighbor_address)
-                elif election_message['mid'] > self._my_uuid:
-                    # send received election message to left neighbour
-                    self._participant = True
-                    self._ring_socket.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
-                elif election_message['mid'] == self._my_uuid:
-                    election_message["isLeader"] = True
-                    # send new election message to left neighbour
-                    self._participant = False
-                    self._ring_socket.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+                outputs = []
+
+            if self._ring_socket in writable:
+                try:
+                    data = self._outQueue.get_nowait()
+                except queue.Empty:
+                    outputs = []
+                else:
+                    self._ring_socket.sendto(data[0], data[1])
+
+            # Check if socket is still open
+            if self._isSocketClosed():
+                self._logger.debug("connection reset by peer")
+                self.onClose()
+                break
+
+    def onData(self, data):
+        election_message = json.loads(data.decode('UTF-8'))
+
+        if election_message['isLeader']:
+            self.__on_leader_election(election_message['mid'])
+            # forward received election message to left neighbour
+            if election_message['mid'] != self._my_uuid:
+                self._participant = False
+                self.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+        else:
+            if election_message['mid'] < self._my_uuid and not self._participant:
+                new_election_message = {
+                    "mid": self._my_uuid,
+                    "isLeader": False
+                }
+                self._participant = True
+                # send received election message to left neighbour
+                self.sendto(json.dumps(new_election_message).encode('UTF-8'), self._neighbor_address)
+            elif election_message['mid'] > self._my_uuid:
+                # send received election message to left neighbour
+                self._participant = True
+                self.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+            elif election_message['mid'] == self._my_uuid:
+                election_message["isLeader"] = True
+                # send new election message to left neighbour
+                self._participant = False
+                self.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+
+    def sendto(self, data, address):
+        self._outQueue.put((data, address))
 
     def start_election(self):
         election_message = {
@@ -99,6 +134,20 @@ class LCR:
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+
+    def shutdown(self):
+        self._stopRequest = True
+
+    def _isSocketClosed(self):
+        try:
+            data = self._ring_socket.recv(16, socket.MSG_PEEK)
+            if len(data) == 0:
+                return True
+        except BlockingIOError:
+            return False
+        except ConnectionResetError:
+            return True
+        return False
 
 
 if __name__ == '__main__':

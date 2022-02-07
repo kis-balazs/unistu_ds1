@@ -188,6 +188,7 @@ class Middleware:
         self.logger.info("New leader: {}".format(leader_uuid))
 
     def shutdown(self):
+        self.election.shutdown()
         for client in self.clients.values():
             client.closeConnection()
         for replica in self.replicas.values():
