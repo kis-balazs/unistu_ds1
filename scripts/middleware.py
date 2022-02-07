@@ -168,7 +168,7 @@ class Middleware:
             self.logger.info("Accepted into cluster")
             self.uuid = uuid.UUID(body.uuid)
             self.startElectionThread(self.replicaElectionPort)
-            time.sleep(2)
+            time.sleep(0.5)
             self.election.start_election()
         else:
             self.election.update_ring(self.replicaPeerAddresses.keys(), self.replicaPeerAddresses)

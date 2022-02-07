@@ -39,10 +39,11 @@ def find_primary():
         # Receive response
         data, address = broadcast_socket.recvfrom(1024)
         msg = data.decode('UTF-8').split()
-        if len(msg) != 3:
+        if len(msg) != 4:
             return None
         if msg[0] == WHOIS_RES:
-            primary = PrimaryInfo(ip=address[0], server_port=int(msg[1]), replica_port=int(msg[2]))
+            print('ip', msg[1])
+            primary = PrimaryInfo(ip=msg[1], server_port=int(msg[2]), replica_port=int(msg[3]))
             discovery_logger.info('Received primary address: {}'.format(str(primary)))
             return primary
     except socket.timeout:
@@ -68,6 +69,9 @@ class DiscoveryServerThread(Thread):
         sock.settimeout(5)
         sock.bind(('', DISCOVERY_PORT))
 
+        own_host = socket.gethostname()
+        own_ip = socket.gethostbyname(own_host)
+
         self._logger.info('Start listening for discovery requests...')
         try:
             while not self._stopEvent.is_set():
@@ -75,7 +79,7 @@ class DiscoveryServerThread(Thread):
                     data, address = sock.recvfrom(1024)
                     if data.decode('UTF-8') == WHOIS_REQ:
                         self._logger.debug('Received request from ' + str(address))
-                        sock.sendto("{} {} {}".format(WHOIS_RES, self._server_port, self._replica_port).encode('UTF-8'), address)
+                        sock.sendto("{} {} {} {}".format(WHOIS_RES, own_ip, self._server_port, self._replica_port).encode('UTF-8'), address)
                 except socket.timeout:
                     continue
         finally:
