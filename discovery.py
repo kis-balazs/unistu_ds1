@@ -3,27 +3,15 @@ import multiprocessing
 import socket
 from threading import Thread
 
+from scripts.middleware import PeerInfo
+
 DISCOVERY_PORT = 37020
 
 WHOIS_REQ = 'whois_primary_req'
 WHOIS_RES = 'whois_primary_res'
+PRIMARY_UP = 'primary_up'
 
 discovery_logger = logging.getLogger("discovery")
-
-class PrimaryInfo:
-    def __init__(self, ip, server_port, replica_port):
-        self.ip = ip
-        self.server_port = server_port
-        self.replica_port = replica_port
-
-    def __str__(self):
-        return "ip={} server_port={} replica_port={}".format(self.ip, self.server_port, self.replica_port)
-
-    def serverAddress(self):
-        return self.ip, self.server_port
-
-    def replicaAddress(self):
-        return self.ip, self.replica_port
 
 def find_primary():
     discovery_logger.info('Starting discovery process')
@@ -39,11 +27,16 @@ def find_primary():
         # Receive response
         data, address = broadcast_socket.recvfrom(1024)
         msg = data.decode('UTF-8').split()
-        if len(msg) != 4:
+        if len(msg) != 5:
             return None
         if msg[0] == WHOIS_RES:
             print('ip', msg[1])
-            primary = PrimaryInfo(ip=msg[1], server_port=int(msg[2]), replica_port=int(msg[3]))
+            primary = PeerInfo(
+                ip=msg[1], 
+                server_port=int(msg[2]), 
+                replica_port=int(msg[3]),
+                election_port=int(msg[4])
+            )
             discovery_logger.info('Received primary address: {}'.format(str(primary)))
             return primary
     except socket.timeout:
@@ -53,14 +46,29 @@ def find_primary():
 
     return None
 
+def send_primary_up(own_uuid):
+    discovery_logger.info('Sending primary up message')
+    broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
+    broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    try:
+        # Send request
+        discovery_logger.debug('Sending request')
+        broadcast_socket.sendto("{} {}".format(PRIMARY_UP, str(own_uuid)).encode('UTF-8'), ('255.255.255.255', DISCOVERY_PORT))
+    finally:
+        broadcast_socket.close()
 
 class DiscoveryServerThread(Thread):
-    def __init__(self, server_port, replica_port):
+    def __init__(self, peer_info, is_primary, on_primary_up):
         Thread.__init__(self)
         self._stopEvent = multiprocessing.Event()
         self._logger = logging.getLogger("discovery_server")
-        self._server_port = server_port
-        self._replica_port = replica_port
+        self._peer_info = peer_info
+        self._is_primary = is_primary
+        self._on_primary_up = on_primary_up
+
+    def set_is_primary(self, is_primary):
+        self._is_primary = is_primary
 
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
@@ -69,17 +77,29 @@ class DiscoveryServerThread(Thread):
         sock.settimeout(5)
         sock.bind(('', DISCOVERY_PORT))
 
-        own_host = socket.gethostname()
-        own_ip = socket.gethostbyname(own_host)
-
+        self._logger.debug("Running as {}".format('primary' if self._is_primary else 'replica'))
         self._logger.info('Start listening for discovery requests...')
         try:
             while not self._stopEvent.is_set():
                 try:
                     data, address = sock.recvfrom(1024)
-                    if data.decode('UTF-8') == WHOIS_REQ:
+                    msg = data.decode('UTF-8').split()
+                    if len(msg) == 0:
+                        continue
+                    if msg[0] == WHOIS_REQ and self._is_primary:
                         self._logger.debug('Received request from ' + str(address))
-                        sock.sendto("{} {} {} {}".format(WHOIS_RES, own_ip, self._server_port, self._replica_port).encode('UTF-8'), address)
+                        sock.sendto(
+                            "{} {} {} {} {}".format(
+                                WHOIS_RES, 
+                                self._peer_info.ip, 
+                                self._peer_info.server_port, 
+                                self._peer_info.replica_port,
+                                self._peer_info.election_port
+                            ).encode('UTF-8'),
+                            address
+                        )
+                    elif msg[0] == PRIMARY_UP and len(msg) > 1:
+                        self._on_primary_up(msg[1])
                 except socket.timeout:
                     continue
         finally:

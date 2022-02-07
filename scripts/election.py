@@ -98,11 +98,11 @@ class LCR:
         election_message = json.loads(data.decode('UTF-8'))
 
         if election_message['isLeader']:
-            self.__on_leader_election(election_message['mid'])
             # forward received election message to left neighbour
             if election_message['mid'] != self._my_uuid:
                 self._participant = False
                 self.sendto(json.dumps(election_message).encode('UTF-8'), self._neighbor_address)
+            self.__on_leader_election(election_message['mid'])
         else:
             if election_message['mid'] < self._my_uuid and not self._participant:
                 new_election_message = {
