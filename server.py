@@ -17,7 +17,7 @@ REPLCIA_PORT = 5002
 ELECTION_PORT = 5003
 
 class Server(threading.Thread):
-    def __init__(self, server_port, replica_port, election_port):
+    def __init__(self, server_port, replica_port, election_port, skip_discovery):
         threading.Thread.__init__(self)
         self._discoveryThread = None
         self._primary = None
@@ -25,18 +25,23 @@ class Server(threading.Thread):
         self._server_port = server_port
         self._replica_port = replica_port
         self._election_port = election_port
+        self._skip_discovery = skip_discovery
 
     def run(self):
-        self._logger.info("Searching for primary...")
-        self._primary = discovery.find_primary()
-        if self._primary is None:
-            self._logger.info("No primary found. Promoting self.")
-            # We will become primary
+        if self._skip_discovery:
+            self._logger.info("Skipping discovery. Promoting self.")
             self.promote()
-        else: 
-            # Start in replica mode
-            self._logger.info("Primary found. Starting in replica mode.".format())
-            self.demote()
+        else:
+            self._logger.info("Searching for primary...")
+            self._primary = discovery.find_primary()
+            if self._primary is None:
+                self._logger.info("No primary found. Promoting self.")
+                # We will become primary
+                self.promote()
+            else: 
+                # Start in replica mode
+                self._logger.info("Primary found. Starting in replica mode.".format())
+                self.demote()
 
     def promote(self):
         self._startDiscoveryThread()
@@ -260,8 +265,9 @@ if __name__ == '__main__':
     server_port = SERVER_PORT
     replica_port = REPLCIA_PORT
     election_port = ELECTION_PORT
+    skip_discovery = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 's:r:e:', ['server-port=', 'replica-port=', 'election_port='])
+        opts, args = getopt.getopt(sys.argv[1:], 's:r:e:p', ['server-port=', 'replica-port=', 'election_port=', 'skip-discovery'])
         for o, a in opts:
             if o in ('-s', '--server-port'):
                 server_port = int(a)
@@ -269,6 +275,8 @@ if __name__ == '__main__':
                 replica_port = int(a)
             elif o in ('-e', '--election-port'):
                 election_port = int(a)
+            elif o in ('-p', '--skip-discovery'):
+                skip_discovery = True
     except getopt.GetoptError:
         print("Invalid arguments")
         sys.exit(1)
@@ -276,7 +284,7 @@ if __name__ == '__main__':
         print("Failed to parse arguments")
         sys.exit(1)
 
-    server = Server(server_port, replica_port, election_port)
+    server = Server(server_port, replica_port, election_port, skip_discovery)
 
     signal.signal(signal.SIGINT, lambda s, f: server.shutdown())
     signal.signal(signal.SIGTERM, lambda s, f: server.shutdown())
