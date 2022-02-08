@@ -29,9 +29,9 @@ class PeerInfo:
         return self.ip, self.election_port
 
 class History:
-    def __init__(self):
-        self._history = []
-        self._backlog = []
+    def __init__(self, history=[], backlog=[]):
+        self._history = history
+        self._backlog = backlog
 
     def on_new_message(self, msg, sender_uuid: uuid.UUID):
         server_view_vc = Middleware.get().vc.vcDictionary
@@ -63,6 +63,9 @@ class History:
 
     def get_history(self):
         return self._history
+
+    def get_backlog(self):
+        return self._backlog
 
     def try_pop_backlog(self, msg, sender_uuid):
         if not self._backlog:
@@ -155,7 +158,7 @@ class Middleware:
         msg = Message.decode(data)
         self.logger.debug("received message '{}'".format(msg.type))
         if msg.type == 'join_replica':
-            self.onJoinAccepted(msg.body)
+            self.onJoinAccepted(msg)
         if msg.type == 'replica_update':
             self.onPeerUpdate(msg.body)
         if msg.type == 'history_replica':
@@ -194,7 +197,11 @@ class Middleware:
         self.sendUpdatedPeerList()
         self.update_election_ring()
 
-        msg = Message.encode(self.vc, 'join_replica', True, str(replica.uuid))
+        msg = Message.encode(self.vc, 'join_replica', True, {
+            'uuid': str(replica.uuid),
+            'history': self.history.get_history(),
+            'backlog': self.history.get_backlog(),
+        })
         replica.send(msg)
     
     def sendUpdatedPeerList(self):
@@ -235,9 +242,11 @@ class Middleware:
             uuid: peer.electionAddress() for uuid, peer in self.peers.items()
         })
 
-    def onJoinAccepted(self, own_uuid):
+    def onJoinAccepted(self, msg):
         self.logger.info("Accepted into cluster")
-        self.uuid = uuid.UUID(own_uuid)
+        self.uuid = uuid.UUID(msg.body['uuid'])
+        self.vc = VectorClock(copyDict=msg.vc)
+        self.history = History(history=msg.body['history'], backlog=msg.body['backlog'])
         
         self.startElectionThread(self.replicaPeerInfo.election_port)
         time.sleep(0.5)
