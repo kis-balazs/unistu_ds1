@@ -131,7 +131,6 @@ class Server(threading.Thread):
         self._replicaThread.start()
     
     def _on_primary_up(self, primary_uuid):
-        self._logger.debug("primary {} is up".format(primary_uuid))
         Middleware.get().onPrimaryUpMsg(primary_uuid)
 
 

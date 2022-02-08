@@ -1,6 +1,7 @@
 import logging
-import multiprocessing
 import socket
+import queue
+import select
 from threading import Thread
 
 from scripts.middleware import PeerInfo
@@ -61,13 +62,15 @@ def send_primary_up(own_uuid):
 class DiscoveryServerThread(Thread):
     def __init__(self, peer_info, is_primary, on_primary_up):
         Thread.__init__(self)
-        self._stopEvent = multiprocessing.Event()
+        self._stopRequest = False
         self._logger = logging.getLogger("discovery_server")
         self._peer_info = peer_info
         self._is_primary = is_primary
         self._on_primary_up = on_primary_up
+        self._outQueue = queue.Queue(1024)
 
     def set_is_primary(self, is_primary):
+        self._logger.debug("Setting is_primary: {}".format(str(is_primary)))
         self._is_primary = is_primary
 
     def run(self):
@@ -75,39 +78,74 @@ class DiscoveryServerThread(Thread):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.settimeout(5)
+        sock.setblocking(0)
         sock.bind(('', DISCOVERY_PORT))
 
-        self._logger.debug("Running as {}".format('primary' if self._is_primary else 'replica'))
-        self._logger.info('Start listening for discovery requests...')
-        try:
-            while not self._stopEvent.is_set():
+        outputs = []
+
+        while not self._stopRequest or not self._outQueue.empty():
+            readable, writable, exceptional = select.select([sock], outputs, [], 0.5)
+            if sock in readable and not self._stopRequest:
+                data, address = sock.recvfrom(1024)
+                if data:
+                    self.onData(data, address)
+
+            if not self._outQueue.empty():
+                outputs = [sock]
+            else:
+                outputs = []
+
+            if sock in writable:
                 try:
-                    data, address = sock.recvfrom(1024)
-                    msg = data.decode('UTF-8').split()
-                    if len(msg) == 0:
-                        continue
-                    if msg[0] == WHOIS_REQ and self._is_primary:
-                        self._logger.debug('Received request from ' + str(address))
-                        sock.sendto(
-                            "{} {} {} {} {}".format(
-                                WHOIS_RES, 
-                                self._peer_info.ip, 
-                                self._peer_info.server_port, 
-                                self._peer_info.replica_port,
-                                self._peer_info.election_port
-                            ).encode('UTF-8'),
-                            address
-                        )
-                    elif msg[0] == PRIMARY_UP and len(msg) > 1:
-                        self._on_primary_up(msg[1])
-                except socket.timeout:
-                    continue
-        finally:
-            sock.close()
+                    data = self._outQueue.get_nowait()
+                except queue.Empty:
+                    outputs = []
+                else:
+                    sock.sendto(data[0], data[1])
+
+            # Check if socket is still open
+            if self._isSocketClosed(sock):
+                self._logger.debug("connection reset by peer")
+                self.onClose()
+                break
+
+        sock.close()
+
+    def onData(self, data, address):
+        msg = data.decode('UTF-8').split()
+        if len(msg) == 0:
+            return
+        if msg[0] == WHOIS_REQ and self._is_primary:
+            self._logger.debug('Received request from ' + str(address))
+            self._sendto(
+                "{} {} {} {} {}".format(
+                    WHOIS_RES, 
+                    self._peer_info.ip, 
+                    self._peer_info.server_port, 
+                    self._peer_info.replica_port,
+                    self._peer_info.election_port
+                ).encode('UTF-8'),
+                address
+            )
+        elif msg[0] == PRIMARY_UP and len(msg) > 1:
+            self._on_primary_up(msg[1])
+
+    def onClose(self):
+        pass
 
     def terminate(self):
-        self._stopEvent.set()
+        self._stopRequest = True
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(''.encode('UTF-8'), ('', DISCOVERY_PORT))
-        sock.close()
+    def _isSocketClosed(self, sock):
+        try:
+            data = sock.recv(16, socket.MSG_PEEK)
+            if len(data) == 0:
+                return True
+        except BlockingIOError:
+            return False
+        except ConnectionResetError:
+            return True
+        return False
+
+    def _sendto(self, data, address):
+        self._outQueue.put((data, address))

@@ -231,7 +231,6 @@ class Middleware:
         self.election.start_election()
 
     def onPeerUpdate(self, body):
-        # self.logger.debug(body.replicas)
         self.logger.debug("\nReplicas:\n{}".format('\n'.join([
             '\t{} (server_port={})'.format(r['uuid'], str(r['info']['server_port']))
             for r in body.replicas
@@ -256,15 +255,6 @@ class Middleware:
         self.peers[str(self.uuid)] = own_peer_info
         self.startElectionThread(own_peer_info.election_port)
 
-    def msgPrimaryStarted(self, primary_uuid):
-        if primary_uuid != self.electedLeader:
-            self.logger.warn("Received 'primary_staretd' from {}, but elected leader is {}".format(str(primary_uuid), str(self.electedLeader)))
-            return
-        
-        primary_peer = self.peers[primary_uuid]
-        self.isPrimary = False
-        self.serverHandle.demote(primary_peer)
-
     def startElectionThread(self, port):
         if self.electionThread:
             return
@@ -279,6 +269,7 @@ class Middleware:
     def onNewLeader(self, leader_uuid):
         self.logger.info("New leader: {}".format(leader_uuid))
         self.electedLeader = leader_uuid
+        print(str(self.uuid), leader_uuid, str(self.isPrimary))
         if str(self.uuid) == leader_uuid and not self.isPrimary:
             # Was replica before. Promote self
             self.isPrimary = True
@@ -290,6 +281,7 @@ class Middleware:
             self.serverHandle.promote()
 
     def onPrimaryUpMsg(self, primary_uuid):
+        self.logger.debug("Received primary_up: leader={} elected={}".format(primary_uuid, self.electedLeader))
         if primary_uuid == str(self.uuid):
             # Own message. Ignore
             return
@@ -298,6 +290,7 @@ class Middleware:
             # Primary was not elected. Ignore
             return
 
+        self.isPrimary = False
         self.primaryUuid = uuid.UUID(primary_uuid)
         self.serverHandle.demote(self.peers[primary_uuid])
 
@@ -365,8 +358,6 @@ class Replica:
         msg = Message.decode(data)
         if msg.type == 'join_replica_req':
             Middleware.get().joinReplica(self, msg.body)
-        elif msg.type == 'primary_started':
-            Middleware.get().msgPrimaryStarted(msg.body)
         elif msg.type == 'rejoin_replica_req':
             Middleware.get().rejoinReplica(self, msg.body)
 
