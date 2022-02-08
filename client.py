@@ -13,13 +13,15 @@ ACK_MSG = "ack"
 
 
 class Client(threading.Thread):
-    def __init__(self, address, nickname):
+    def __init__(self, address, nickname, vc=None):
         threading.Thread.__init__(self)
         self._primary = address
         self._sock = None
         self._nickname = nickname
         self.on_receive = None
-        self.vc = VectorClock()
+        self.on_close = None
+        self.on_history = None
+        self.vc = vc if vc is not None else VectorClock()
         self.uuid = None
         self._logger = logging.getLogger("client_thread")
         self._stopRequest = False
@@ -57,16 +59,18 @@ class Client(threading.Thread):
 
             if msg.type == 'send_text':
                 self._logger.debug("receiving text: '{}'".format(msg.body))
+                if self.on_receive is not None:
+                    self.on_receive(msg.body)
             elif msg.type == 'history':
                 self._logger.debug("receiving history of conversation from server!")
-            if self.on_receive is not None:
-                self.on_receive(msg.body)
+                if self.on_history is not None:
+                    self.on_history(msg.body)
         elif msg.type == "server_close":
             self._logger.info("Server closed")
             if self.on_receive is not None:
-                self.on_receive('$> server disconnected...')
+                self.on_close()
 
-        assert self.vc.vcDictionary == msg.vc
+        #assert self.vc.vcDictionary == msg.vc
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))

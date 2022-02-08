@@ -1,5 +1,6 @@
 import logging
 import sys
+import time
 import tkinter
 import tkinter.simpledialog
 from threading import Thread
@@ -11,6 +12,7 @@ from client import Client
 logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
 client = None
+nickname = None
 
 
 def user_interface():
@@ -24,15 +26,21 @@ def user_interface():
         else:
             raise NotImplementedError('received messages by send_test | history can be only string | list!')
 
-    def init_client(nickname):
+    def on_history(msgs):
+        msg_list.delete(0, tkinter.END)
+        receive(msgs)
+
+    def init_client(nickname, alert=False, vc=None):
         global client
         # networking init
         primary = discovery.find_primary()
         if primary is not None:
-            client = Client(primary.serverAddress(), nickname)
+            client = Client(primary.serverAddress(), nickname, vc=vc)
             client.on_receive = receive
+            client.on_close = on_client_close
+            client.on_history = on_history
             client.start()
-        else:
+        elif alert:
             messagebox.showerror('Error!', 'Server not available!')
             sys.exit(1)
 
@@ -48,6 +56,12 @@ def user_interface():
             top.destroy()
             client.shutdown()
 
+    def on_client_close():
+        receive('$> server disconnected...')
+        vc = client.vc
+        time.sleep(0.5)
+        init_client(nickname, vc=vc)
+
     # ############################################################################################
     top = tkinter.Tk()
     top.title("DS Chat")
@@ -56,7 +70,7 @@ def user_interface():
     nickname = tkinter.simpledialog.askstring("Nickname", "Enter nickname:", parent=top)
     if nickname:
         top.title("DS Chat - " + nickname)
-        init_client(nickname)
+        init_client(nickname, alert=True)
         top.deiconify()
     else:
         return
