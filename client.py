@@ -56,7 +56,8 @@ class Client(threading.Thread):
                     assert self.vc.vcDictionary[str(self.uuid)] == msg.vc[str(self.uuid)]
                 new_vc[k] = v
             self.vc = VectorClock(copyDict=new_vc)
-
+        
+            assert self.vc.vcDictionary == msg.vc
             if msg.type == 'send_text':
                 self._logger.debug("receiving text: '{}'".format(msg.body))
                 if self.on_receive is not None:
@@ -69,8 +70,6 @@ class Client(threading.Thread):
             self._logger.info("Server closed")
             if self.on_receive is not None:
                 self.on_close()
-
-        #assert self.vc.vcDictionary == msg.vc
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))
