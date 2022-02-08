@@ -306,9 +306,9 @@ class Middleware:
         self.primaryUuid = uuid.UUID(primary_uuid)
         self.serverHandle.demote(self.peers[primary_uuid])
 
-        #for client in self.clients.keys():
-        #    client.closeConnection()
-        #    self.clientDisconnected(client)
+        for client in self.clients.values():
+            client.closeConnection()
+            self.clientDisconnected(client)
 
     def shutdown(self):
         self.election.shutdown()
