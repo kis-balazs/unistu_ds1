@@ -188,6 +188,8 @@ class Connection(threading.Thread):
         try:
             self.onOpen()
             self._eventLoop()
+        except OSError:
+            self.onClose(not self._stopRequest)
         except Exception as e:
             self._logger.error("Some error: " + str(e))
             traceback.print_exc()
