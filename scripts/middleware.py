@@ -190,6 +190,11 @@ class Middleware:
         replica.send(msg)
     
     def sendUpdatedPeerList(self):
+        self.logger.debug("\nSending replicas:\n{}".format('\n'.join([
+            '\t{} (server_port={})'.format(uuid, str(info.server_port))
+            for uuid, info in self.peers.items()
+        ])))
+
         msg = Message.encode(self.vc, 'replica_update', True, {
             'primary': str(self.uuid),
             'replicas': [

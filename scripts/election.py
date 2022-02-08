@@ -139,7 +139,7 @@ class LCR:
 
     def _isSocketClosed(self):
         try:
-            data = self._ring_socket.recv(16, socket.MSG_PEEK)
+            data = self._ring_socket.recvfrom(16, socket.MSG_PEEK)
             if len(data) == 0:
                 return True
         except BlockingIOError:
