@@ -33,7 +33,7 @@ class History:
         self._history = []
         self._backlog = []
 
-    def on_new_message(self, msg, sender):
+    def on_new_message(self, msg, sender_uuid: uuid.UUID):
         server_view_vc = Middleware.get().vc.vcDictionary
         client_view_vc = msg.vc
         _backlog_object = None
@@ -45,12 +45,12 @@ class History:
                 pass
             # the exactly next message, just add to history
             elif client_view_vc[k] == server_view_vc[k] + 1:
-                if str(sender.uuid) == k:
+                if str(sender_uuid) == k:
                     _append_to_history_index = k
                 else:
-                    _backlog_object = (msg, sender)
+                    _backlog_object = (msg, sender_uuid)
             else:
-                _backlog_object = (msg, sender)
+                _backlog_object = (msg, sender_uuid)
 
         if _backlog_object:
             self._backlog.append(_backlog_object)
@@ -70,13 +70,13 @@ class History:
 
         elem_to_pop = None
 
-        for bmsg, bsender in self._backlog:
-            for k, v in bmsg.vc:
-                if bmsg.vc[k] <= msg.vc[k]:
+        for b_msg, b_sender in self._backlog:
+            for k, v in b_msg.vc:
+                if b_msg.vc[k] <= msg.vc[k]:
                     pass
-                elif bmsg.vc[k] == msg.vc[k] + 1:
+                elif b_msg.vc[k] == msg.vc[k] + 1:
                     if k == sender_uuid:
-                        elem_to_pop = (bmsg, bsender)
+                        elem_to_pop = (b_msg, b_sender)
                 else:
                     elem_to_pop = None
 
@@ -158,6 +158,9 @@ class Middleware:
             self.onJoinAccepted(msg.body)
         if msg.type == 'replica_update':
             self.onPeerUpdate(msg.body)
+        if msg.type == 'history_replica':
+            self.logger.debug('receiving message of history replication')
+            self.history.on_new_message(msg.body['msg'], uuid.UUID(msg.body['sender_uuid']))
 
     def replicaSend(self, data):
         self.replicaConn.send(data)
@@ -316,7 +319,12 @@ class Middleware:
         self.update_election_ring()
 
     def newMessage(self, send_client, message):
-        self.history.on_new_message(message, send_client)
+        self.history.on_new_message(message, send_client.uuid)
+        for r in self.replicas.values():
+            data = Message.encode(self.vc, 'history_replica', True,
+                                  {'msg': message, 'sender_uuid': str(send_client.uuid)}
+            )
+            r.send(data)
 
         for client in self.clients.values():
             data = Message.encode(self.vc, 'send_text', True, message.body)

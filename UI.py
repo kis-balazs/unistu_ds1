@@ -30,7 +30,7 @@ def user_interface():
         primary = discovery.find_primary()
         if primary is not None:
             client = Client(primary.serverAddress(), nickname)
-            client.onreceive = receive
+            client.on_receive = receive
             client.start()
         else:
             messagebox.showerror('Error!', 'Server not available!')

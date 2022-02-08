@@ -18,7 +18,7 @@ class Client(threading.Thread):
         self._primary = address
         self._sock = None
         self._nickname = nickname
-        self.onreceive = None
+        self.on_receive = None
         self.vc = VectorClock()
         self.uuid = None
         self._logger = logging.getLogger("client_thread")
@@ -59,18 +59,14 @@ class Client(threading.Thread):
                 self._logger.debug("receiving text: '{}'".format(msg.body))
             elif msg.type == 'history':
                 self._logger.debug("receiving history of conversation from server!")
-            if self.onreceive is not None:
-                self.onreceive(msg.body)
+            if self.on_receive is not None:
+                self.on_receive(msg.body)
         elif msg.type == "server_close":
             self._logger.info("Server closed")
-            if self.onreceive is not None:
-                self.onreceive('$> server disconnected...')
+            if self.on_receive is not None:
+                self.on_receive('$> server disconnected...')
 
         assert self.vc.vcDictionary == msg.vc
-        # from pprint import pprint
-        # print('####')
-        # pprint(self.vc.vcDictionary)
-        # print('####')
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))
