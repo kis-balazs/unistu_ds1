@@ -160,7 +160,12 @@ class Middleware:
             self.onPeerUpdate(msg.body)
         if msg.type == 'history_replica':
             self.logger.debug('receiving message of history replication')
-            self.history.on_new_message(msg.body['msg'], uuid.UUID(msg.body['sender_uuid']))
+            message = {
+                'vc': msg.body['vc'],
+                'body': msg.body['msg'],
+            }
+            self.vc = VectorClock(copyDict=msg.vc)
+            self.history.on_new_message(Message.DotDict(message), uuid.UUID(msg.body['sender_uuid']))
 
     def replicaSend(self, data):
         self.replicaConn.send(data)
@@ -301,6 +306,10 @@ class Middleware:
         self.primaryUuid = uuid.UUID(primary_uuid)
         self.serverHandle.demote(self.peers[primary_uuid])
 
+        #for client in self.clients.keys():
+        #    client.closeConnection()
+        #    self.clientDisconnected(client)
+
     def shutdown(self):
         self.election.shutdown()
         for client in self.clients.values():
@@ -309,8 +318,10 @@ class Middleware:
             replica.closeConnection()
 
     def clientDisconnected(self, client):
-        self.clients.pop(str(client.uuid))
-        del self.vc[str(client.uuid)]
+        if str(client.uuid) in self.clients.keys():
+            self.clients.pop(str(client.uuid))
+        if str(client.uuid) in self.vc.vcDictionary.keys():
+            del self.vc[str(client.uuid)]
 
     def replicaDisconnected(self, replica):
         self.replicas.pop(str(replica.uuid))
@@ -319,11 +330,10 @@ class Middleware:
         self.update_election_ring()
 
     def newMessage(self, send_client, message):
+        vc = VectorClock(copyDict=self.vc.vcDictionary.copy())
         self.history.on_new_message(message, send_client.uuid)
         for r in self.replicas.values():
-            data = Message.encode(self.vc, 'history_replica', True,
-                                  {'msg': message, 'sender_uuid': str(send_client.uuid)}
-            )
+            data = Message.encode(vc, 'history_replica', True, {'vc': message.vc, 'msg': message.body, 'sender_uuid': str(send_client.uuid)})
             r.send(data)
 
         for client in self.clients.values():
