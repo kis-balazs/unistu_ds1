@@ -245,6 +245,7 @@ class Middleware:
     def onJoinAccepted(self, msg):
         self.logger.info("Accepted into cluster")
         self.uuid = uuid.UUID(msg.body['uuid'])
+        
         self.vc = VectorClock(copyDict=msg.vc)
         self.history = History(history=msg.body['history'], backlog=msg.body['backlog'])
         
