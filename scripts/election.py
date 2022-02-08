@@ -91,7 +91,6 @@ class LCR:
             # Check if socket is still open
             if self._isSocketClosed():
                 self._logger.debug("connection reset by peer")
-                self.onClose()
                 break
 
     def onData(self, data):
