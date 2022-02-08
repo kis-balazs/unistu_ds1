@@ -32,7 +32,7 @@ class LCR:
         # get neighbor address in the formed ring
         assert self._ring
         self._neighbor_address = self.get_neighbour(self._my_uuid)
-        self._logger.debug("Neigbor address: {}".format(str(self._neighbor_address)))
+        self._logger.debug("Neighbor address: {}".format(str(self._neighbor_address)))
 
     @staticmethod
     def __form_ring(list_of_uuids):
@@ -44,7 +44,7 @@ class LCR:
         # get neighbor address in the formed ring
         assert self._ring
         self._neighbor_address = self.get_neighbour(self._my_uuid)
-        self._logger.debug("Neigbor address: {}".format(str(self._neighbor_address)))
+        self._logger.debug("Neighbor address: {}".format(str(self._neighbor_address)))
 
     def get_neighbour(self, current_node_uuid, direction='left'):
         current_node_index = self._ring.index(current_node_uuid) if current_node_uuid in self._ring else -1
