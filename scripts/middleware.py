@@ -267,9 +267,8 @@ class Middleware:
         self.electionThread.start()
 
     def onNewLeader(self, leader_uuid):
-        self.logger.info("New leader: {}".format(leader_uuid))
+        self.logger.info("New leader: {} (is_primary={})".format(leader_uuid, str(self.isPrimary)))
         self.electedLeader = leader_uuid
-        print(str(self.uuid), leader_uuid, str(self.isPrimary))
         if str(self.uuid) == leader_uuid and not self.isPrimary:
             # Was replica before. Promote self
             self.isPrimary = True
