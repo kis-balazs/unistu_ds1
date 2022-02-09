@@ -7,6 +7,8 @@ class Message:
     # in-class class to access the decode message's fields using dot notation
     class DotDict(dict):
         __getattr__ = dict.get
+        def __getstate__(self): return self.__dict__
+        def __setstate__(self, d): self.__dict__.update(d)
 
     @staticmethod
     def encode(vc: VectorClock, type: str, success: bool, msg) -> bytes:

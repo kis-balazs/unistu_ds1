@@ -42,16 +42,14 @@ class History:
 
         for k, v in server_view_vc.items():
             # already received past message
-            if client_view_vc[k] <= server_view_vc[k]:
+            if k not in client_view_vc.keys() or client_view_vc[k] <= server_view_vc[k]:
                 pass
-            # the exactly next message, just add to history
-            elif client_view_vc[k] == server_view_vc[k] + 1:
+            # the next message, just add to history
+            elif client_view_vc[k] > server_view_vc[k]:
                 if str(sender_uuid) == k:
                     _append_to_history_index = k
                 else:
                     _backlog_object = (msg, sender_uuid)
-            else:
-                _backlog_object = (msg, sender_uuid)
 
         if _backlog_object:
             self._backlog.append(_backlog_object)
@@ -139,12 +137,10 @@ class Middleware:
         client.send(data)
 
         # if client joined after conversation started
-        if self.history.get_history():
-            header = '### Message History ###'
-            data = Message.encode(
-                self.vc, 'history', True, [header] + self.history.get_history() + ['#' * len(header)]
-            )
-            client.send(data)
+        print(self.history.get_history())
+        data = Message.encode(self.vc, 'history', True, self.history.get_history())
+        client.send(data)
+
         return client
 
     def replicaOpen(self, conn, peer_info):
@@ -469,6 +465,9 @@ class Client:
         if msg.type == 'send_text':
             self._logger.info('received text: {}'.format(msg.body))
             Middleware.get().newMessage(self, msg)
+        elif msg.type == 'ping':
+            pong_msg = Message.encode(Middleware.get().vc, 'pong', True, None)
+            self.send(pong_msg)
 
     def closeConnection(self, primary_address=None):
         Middleware.get().vc.increaseClock(self.uuid)

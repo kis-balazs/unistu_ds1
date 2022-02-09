@@ -1,5 +1,6 @@
 #!/bin/python3
 import logging
+from re import S
 import select
 import socket
 import threading
@@ -25,6 +26,10 @@ class Client(threading.Thread):
         self.uuid = None
         self._logger = logging.getLogger("client_thread")
         self._stopRequest = False
+        
+        self.healthcheckTimer = None
+        self.healthcheckStop = False
+        self.pingTimeoutTimer = None
 
     def run(self):
         self._sock = self._createSocket(self._primary)
@@ -43,17 +48,51 @@ class Client(threading.Thread):
         sock.connect(address)
         return sock
 
+    def _startHealthchecks(self, clear_flag=True):
+        if clear_flag:
+            self.healthcheckStop = False
+
+        if self.healthcheckStop or self.healthcheckTimer:
+            return
+
+        self.healthcheckTimer = threading.Timer(2, self._sendPing)
+        self.healthcheckTimer.start()
+
+    def _sendPing(self):
+        # Do ping
+        self.vc.increaseClock(self.uuid)
+        msg = Message.encode(self.vc, 'ping', True, None)
+        self._sock.sendall(msg)
+
+        self.pingTimeoutTimer = threading.Timer(1, self._pingTimeout)
+        self.pingTimeoutTimer.start()
+
+        self.healthcheckTimer = None
+        self._startHealthchecks(clear_flag=False)
+
+    def _pingTimeout(self):
+        # Server is down
+        if self.on_receive is not None:
+            self.on_close()
+
+    def _stopHealthchecks(self):
+        if self.healthcheckTimer:
+            self.healthcheckStop = True
+            self.healthcheckTimer.cancel()
+        self.healthcheckTimer = None
+
     def _handleMessage(self, data):
         msg = Message.decode(data)
         if msg.type == "join_cluster":
             self.vc = VectorClock(copyDict=msg.vc)
             self.uuid = uuid.UUID(msg.body.uuid)
+            self._startHealthchecks()
         elif msg.type in ["send_text", "history"]:
             # consolidate server's view with local view on vector clocks
             new_vc = {}
             for k, v in msg.vc.items():
                 if k == str(self.uuid):  # if it's the current client in the vector clock, compare event number
-                    assert self.vc.vcDictionary[str(self.uuid)] == msg.vc[str(self.uuid)]
+                    assert self.vc.vcDictionary[str(self.uuid)] >= msg.vc[str(self.uuid)]
                 new_vc[k] = v
             self.vc = VectorClock(copyDict=new_vc)
         
@@ -68,8 +107,16 @@ class Client(threading.Thread):
                     self.on_history(msg.body)
         elif msg.type == "server_close":
             self._logger.info("Server closed")
+            if self.pingTimeoutTimer:
+                self.pingTimeoutTimer.cancel()
+                self.pingTimeoutTimer = None
             if self.on_receive is not None:
                 self.on_close(msg.body)
+        elif msg.type == "pong":
+            # Cancel timeout
+            if self.pingTimeoutTimer:
+                self.pingTimeoutTimer.cancel()
+                self.pingTimeoutTimer = None
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))
@@ -77,4 +124,10 @@ class Client(threading.Thread):
         self._sock.sendall(Message.encode(self.vc, 'send_text', True, message))
 
     def shutdown(self):
+        self.on_history = None
+        self.on_close = None
+        self.on_receive = None
         self._stopRequest = True
+        self._stopHealthchecks()
+        if self.pingTimeoutTimer:
+            self.pingTimeoutTimer.cancel() 

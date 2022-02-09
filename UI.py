@@ -1,7 +1,5 @@
-from audioop import add
 import logging
 import sys
-import time
 import tkinter
 import tkinter.simpledialog
 from threading import Thread
@@ -15,6 +13,8 @@ logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s',
 client = None
 nickname = None
 
+discovery_thread = None
+stopRequest = False
 
 def user_interface():
     # ############################################################################################
@@ -33,6 +33,7 @@ def user_interface():
 
     def init_client(nickname, alert=False, vc=None, address=None):
         global client
+
         # networking init
         if address:
             address = (address[0], address[1])
@@ -56,22 +57,43 @@ def user_interface():
 
     def on_closing():
         """This function is to be called when the window is closed."""
+        global stopRequest
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             top.destroy()
             client.shutdown()
+            stopRequest = True
+            if discovery_thread:
+                discovery_thread.terminate()
 
-    def on_client_close(primary_address):
+    def on_client_close(primary_address=None):
+        global discovery_thread
+
         vc = client.vc
+        client.shutdown()
         
         if primary_address:
             receive('$> reconnecting to new primary')
-            time.sleep(0.5)
         else:
             receive('$> server disconnected...')
             primary_address=None
 
-        init_client(nickname, vc=vc, address=primary_address)
+        def on_primary(uuid):
+            discovery_thread.terminate()
+
+        def find_primary():
+            primary = discovery.find_primary()
+            if primary and discovery_thread:
+                discovery_thread.terminate()
+
+        discovery_thread = discovery.DiscoveryServerThread(None, False, on_primary)
+        Thread(target=find_primary).start()
+
+        discovery_thread.start()
+        discovery_thread.join()
+
+        if not stopRequest:
+            init_client(nickname, vc=vc, address=primary_address)
 
     # ############################################################################################
     top = tkinter.Tk()
@@ -100,6 +122,7 @@ def user_interface():
     entry_field = tkinter.Entry(top, textvariable=my_msg)
     entry_field.bind("<Return>", send)
     entry_field.pack()
+    entry_field.focus()
     send_button = tkinter.Button(top, text="Send", command=send)
     send_button.pack()
 
