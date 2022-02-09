@@ -22,13 +22,14 @@ class Server(threading.Thread):
         self._primary = None
         self._logger = logging.getLogger("server")
         self._skip_discovery = skip_discovery
+        self._stop_request = False
 
         self._client_listener_started = threading.Event()
         self._replica_listener_started = threading.Event()
 
         own_host = socket.gethostname()
         own_ip = socket.gethostbyname(own_host)
-        self._peer_info = PeerInfo(own_ip, server_port, replica_port, election_port)
+        self._peer_info = PeerInfo('127.0.1.1', server_port, replica_port, election_port)
 
         self._replicaListenerThread = None
         self._clientListenerThread = None
@@ -36,22 +37,23 @@ class Server(threading.Thread):
         self._replicaThread = None
 
     def run(self):
-        self._logger.info("Searching for primary...")
-        Middleware.get().setServerHandle(self)
-        
-        primary = None if self._skip_discovery else discovery.find_primary()
-        self._startDiscoveryThread(primary is None)
-        if primary is None:
-            self._logger.info("No primary found")
-            # We will become primary
-            self.promote()
-            Middleware.get().onPrimaryStart(self._peer_info)
-        else: 
-            # Start in replica mode
-            self._logger.info("Primary found")
-            self.demote(primary)
+        while not self._stop_request:
+            self._logger.info("Searching for primary...")
+            Middleware.get().setServerHandle(self)
+            
+            primary = None if self._skip_discovery else discovery.find_primary()
+            self._startDiscoveryThread(primary is None)
+            if primary is None:
+                self._logger.info("No primary found")
+                # We will become primary
+                self.promote()
+                Middleware.get().onPrimaryStart(self._peer_info)
+            else: 
+                # Start in replica mode
+                self._logger.info("Primary found")
+                self.demote(primary)
 
-        self.loop()
+            self.loop()
     
     def loop(self):
         thread_active = True
@@ -104,7 +106,11 @@ class Server(threading.Thread):
         if self._replicaListenerThread:
             self._replicaListenerThread.shutdown()
 
-    def shutdown(self):
+    def reconnect(self):
+        self.shutdown(reconnect=True)
+
+    def shutdown(self, reconnect=False):
+        self._stop_request = not reconnect
         self._logger.info("shutting down...")
         self._discoveryThread.terminate()
         if self._primary is None:
@@ -113,6 +119,15 @@ class Server(threading.Thread):
         else:
             self._replicaThread.shutdown()
         Middleware.get().shutdown()
+
+        if self._discoveryThread:
+            self._discoveryThread.join()
+        if self._clientListenerThread:
+            self._clientListenerThread.join()
+        if self._replicaListenerThread:
+            self._replicaListenerThread.join()
+        if self._replicaThread and not isinstance(threading.current_thread(), ReplicaClientConnection):
+            self._replicaThread.join()
 
     def _startDiscoveryThread(self, is_primary):
         self._discoveryThread = discovery.DiscoveryServerThread(self._peer_info, is_primary, self._on_primary_up)
@@ -189,11 +204,12 @@ class Connection(threading.Thread):
             self.onOpen()
             self._eventLoop()
         except OSError:
-            self.onClose(not self._stopRequest)
+            pass
         except Exception as e:
             self._logger.error("Some error: " + str(e))
             traceback.print_exc()
         finally:
+            self.onClose(not self._stopRequest)
             self._sock.close()
             self._logger.debug("Connection closed")
 
@@ -237,7 +253,6 @@ class Connection(threading.Thread):
             # Check if socket is still open
             if self._isSocketClosed():
                 self._logger.debug("connection reset by peer")
-                self.onClose(not self._stopRequest)
                 break
 
     def _isSocketClosed(self):

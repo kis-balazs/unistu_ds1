@@ -93,6 +93,8 @@ class LCR:
                 self._logger.debug("connection reset by peer")
                 break
 
+        self._ring_socket.close()
+
     def onData(self, data):
         election_message = json.loads(data.decode('UTF-8'))
 
