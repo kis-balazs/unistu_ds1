@@ -92,7 +92,7 @@ class Client(threading.Thread):
             new_vc = {}
             for k, v in msg.vc.items():
                 if k == str(self.uuid):  # if it's the current client in the vector clock, compare event number
-                    assert self.vc.vcDictionary[str(self.uuid)] >= msg.vc[str(self.uuid)]
+                    assert self.vc.vcDictionary[str(self.uuid)] == msg.vc[str(self.uuid)]
                 new_vc[k] = v
             self.vc = VectorClock(copyDict=new_vc)
         

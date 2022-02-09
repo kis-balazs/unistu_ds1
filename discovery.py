@@ -138,7 +138,7 @@ class DiscoveryServerThread(Thread):
 
     def _isSocketClosed(self, sock):
         try:
-            data = sock.recv(16, socket.MSG_PEEK)
+            data = sock.recv(1024, socket.MSG_PEEK)
             if len(data) == 0:
                 return True
         except BlockingIOError:

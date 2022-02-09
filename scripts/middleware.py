@@ -45,7 +45,7 @@ class History:
             if k not in client_view_vc.keys() or client_view_vc[k] <= server_view_vc[k]:
                 pass
             # the next message, just add to history
-            elif client_view_vc[k] > server_view_vc[k]:
+            elif client_view_vc[k] == server_view_vc[k] + 1:
                 if str(sender_uuid) == k:
                     _append_to_history_index = k
                 else:
@@ -466,6 +466,7 @@ class Client:
             self._logger.info('received text: {}'.format(msg.body))
             Middleware.get().newMessage(self, msg)
         elif msg.type == 'ping':
+            Middleware.get().vc.vcDictionary[str(self.uuid)] = msg.vc[str(self.uuid)]
             pong_msg = Message.encode(Middleware.get().vc, 'pong', True, None)
             self.send(pong_msg)
 
