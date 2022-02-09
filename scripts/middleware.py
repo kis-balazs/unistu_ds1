@@ -92,7 +92,6 @@ class History:
 
 class Middleware:
     __INSTANCE__ = None
-    missed = False
 
     def __init__(self):
         self.vc = VectorClock()
@@ -212,10 +211,7 @@ class Middleware:
         self.replicaSend(msg)
 
         self.replicaHeartbeatTimer = None
-        if Middleware.missed:
-            self.replicaStartHeartbeat(clear_flag=False)
-        else:
-            Middleware.missed = True
+        self.replicaStartHeartbeat(clear_flag=False)
 
     def replicaStopHeartbeat(self):
         if self.replicaHeartbeatTimer:
@@ -366,7 +362,6 @@ class Middleware:
         self.peers[str(self.uuid)] = own_peer_info
         self.startElectionThread(own_peer_info.election_port)
         self.primaryStartHeartbeatChecks()
-        Middleware.missed = True
 
     def startElectionThread(self, port):
         if self.electionThread:
