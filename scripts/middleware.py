@@ -417,7 +417,8 @@ class Middleware:
     def shutdown(self):
         self.primaryStopHeartbeatChecks()
         self.replicaStopHeartbeat()
-        self.election.shutdown()
+        if self.election:
+            self.election.shutdown()
         for client in self.clients.values():
             client.closeConnection()
         for replica in self.replicas.values():

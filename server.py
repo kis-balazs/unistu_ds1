@@ -42,6 +42,9 @@ class Server(threading.Thread):
             Middleware.get().setServerHandle(self)
             
             primary = None if self._skip_discovery else discovery.find_primary()
+            if self._stop_request:
+                break
+            
             self._startDiscoveryThread(primary is None)
             if primary is None:
                 self._logger.info("No primary found")
@@ -112,12 +115,15 @@ class Server(threading.Thread):
     def shutdown(self, reconnect=False):
         self._stop_request = not reconnect
         self._logger.info("shutting down...")
-        self._discoveryThread.terminate()
-        if self._primary is None:
+        if self._discoveryThread:
+            self._discoveryThread.terminate()
+        if self._clientListenerThread:
             self._clientListenerThread.shutdown()
+        if self._replicaListenerThread:
             self._replicaListenerThread.shutdown()
-        else:
+        if self._replicaThread:
             self._replicaThread.shutdown()
+
         Middleware.get().shutdown()
 
         if self._discoveryThread:
