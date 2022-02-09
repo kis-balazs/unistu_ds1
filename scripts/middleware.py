@@ -399,15 +399,16 @@ class Middleware:
             # Primary was not elected. Ignore
             return
 
+        primary_peer = self.peers[primary_uuid]
+
         self.isPrimary = False
         self.primaryUuid = uuid.UUID(primary_uuid)
-        self.serverHandle.demote(self.peers[primary_uuid])
+        self.serverHandle.demote(primary_peer)
         self.primaryStopHeartbeatChecks()
         self.replicaStartHeartbeat()
 
         for client in self.clients.values():
-            client.closeConnection()
-            self.clientDisconnected(client)
+            client.closeConnection([primary_peer.ip, primary_peer.server_port])
 
     def shutdown(self):
         self.primaryStopHeartbeatChecks()
@@ -469,13 +470,13 @@ class Client:
             self._logger.info('received text: {}'.format(msg.body))
             Middleware.get().newMessage(self, msg)
 
-    def closeConnection(self):
+    def closeConnection(self, primary_address=None):
         Middleware.get().vc.increaseClock(self.uuid)
         data = Message.encode(
             Middleware.get().vc,
             'server_close',
             True,
-            None
+            primary_address
         )
         self._conn.send(data)
         self._conn.shutdown()

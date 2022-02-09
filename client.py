@@ -69,7 +69,7 @@ class Client(threading.Thread):
         elif msg.type == "server_close":
             self._logger.info("Server closed")
             if self.on_receive is not None:
-                self.on_close()
+                self.on_close(msg.body)
 
     def sendMessage(self, message):
         self._logger.debug("sending text: '{}'".format(message))

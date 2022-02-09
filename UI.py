@@ -1,3 +1,4 @@
+from audioop import add
 import logging
 import sys
 import time
@@ -30,19 +31,23 @@ def user_interface():
         msg_list.delete(0, tkinter.END)
         receive(msgs)
 
-    def init_client(nickname, alert=False, vc=None):
+    def init_client(nickname, alert=False, vc=None, address=None):
         global client
         # networking init
-        primary = discovery.find_primary()
-        if primary is not None:
-            client = Client(primary.serverAddress(), nickname, vc=vc)
-            client.on_receive = receive
-            client.on_close = on_client_close
-            client.on_history = on_history
-            client.start()
-        elif alert:
-            messagebox.showerror('Error!', 'Server not available!')
-            sys.exit(1)
+        if address:
+            address = (address[0], address[1])
+        else:
+            primary = discovery.find_primary()
+            if primary is None:
+                messagebox.showerror('Error!', 'Server not available!')
+                sys.exit(1)
+            address = primary.serverAddress()
+
+        client = Client(address, nickname, vc=vc)
+        client.on_receive = receive
+        client.on_close = on_client_close
+        client.on_history = on_history
+        client.start()
 
     def send(_=None):
         assert type(my_msg) == tkinter.StringVar, 'my_msg corrupted!'
@@ -56,11 +61,17 @@ def user_interface():
             top.destroy()
             client.shutdown()
 
-    def on_client_close():
-        receive('$> server disconnected...')
+    def on_client_close(primary_address):
         vc = client.vc
-        time.sleep(0.5)
-        init_client(nickname, vc=vc)
+        
+        if primary_address:
+            receive('$> reconnecting to new primary')
+            time.sleep(0.5)
+        else:
+            receive('$> server disconnected...')
+            primary_address=None
+
+        init_client(nickname, vc=vc, address=primary_address)
 
     # ############################################################################################
     top = tkinter.Tk()
