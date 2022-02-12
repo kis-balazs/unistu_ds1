@@ -10,6 +10,7 @@ from scripts.election import LCR
 from scripts.message import Message
 from scripts.vectorclock import VectorClock
 
+
 class PeerInfo:
     def __init__(self, ip, server_port, replica_port, election_port):
         self.ip = ip
@@ -18,7 +19,8 @@ class PeerInfo:
         self.election_port = election_port
 
     def __str__(self):
-        return "ip={} server_port={} replica_port={} election_port".format(self.ip, self.server_port, self.replica_port, self.election_port)
+        return "ip={} server_port={} replica_port={} election_port".format(self.ip, self.server_port, self.replica_port,
+                                                                           self.election_port)
 
     def serverAddress(self):
         return self.ip, self.server_port
@@ -28,6 +30,7 @@ class PeerInfo:
 
     def electionAddress(self):
         return self.ip, self.election_port
+
 
 class History:
     def __init__(self, history=[], backlog=[]):
@@ -114,6 +117,7 @@ class Middleware:
         self.replicaStopHeartbeatFlag = False
         self.primaryHeartbeatTimer = None
         self.primaryStopHeartbeatFlag = False
+        self.pingTimeoutTimer = None
 
     @staticmethod
     def get():
@@ -153,7 +157,7 @@ class Middleware:
         else:
             # Join
             msg = Message.encode(self.vc, 'join_replica_req', True, peer_info)
-            
+
         self.replicaConn.send(msg)
 
     def replicaReceive(self, data):
@@ -171,6 +175,11 @@ class Middleware:
             }
             self.vc = VectorClock(copyDict=msg.vc)
             self.history.on_new_message(Message.DotDict(message), uuid.UUID(msg.body['sender_uuid']))
+        if msg.type == 'pong':
+            # Cancel timeout
+            if self.pingTimeoutTimer:
+                self.pingTimeoutTimer.cancel()
+                self.pingTimeoutTimer = None
 
     def replicaSend(self, data):
         self.replicaConn.send(data)
@@ -179,7 +188,7 @@ class Middleware:
         # differentiate between close from server and graceful shutdown
         self.replicaStopHeartbeat()
         self.replicaConn = None
-        
+
         if byPeer:
             if discovery.find_primary() is not None:
                 self.logger.debug("Reconnecting to primary")
@@ -203,11 +212,18 @@ class Middleware:
         self.replicaHeartbeatTimer.start()
 
     def replicaSendHeartbeat(self):
-        msg = Message.encode(self.vc, 'heartbeat', True, None)
+        msg = Message.encode(self.vc, 'ping', True, None)
         self.replicaSend(msg)
 
         self.replicaHeartbeatTimer = None
         self.replicaStartHeartbeat(clear_flag=False)
+
+        self.pingTimeoutTimer = threading.Timer(3, self._pingTimeout)
+        self.pingTimeoutTimer.start()
+
+    def _pingTimeout(self):
+        self.logger.debug('leader is down!')
+        self.replicaConn.shutdown(byPeer=True)
 
     def replicaStopHeartbeat(self):
         if self.replicaHeartbeatTimer:
@@ -243,7 +259,7 @@ class Middleware:
         for replica in deadReplicas:
             self.logger.debug("Replica heartbeat timed out: {}".format(str(replica.uuid)))
             replica.closeConnection()
-        
+
         self.primaryHeartbeatTimer = None
         self.primaryStartHeartbeatChecks(clear_flag=False)
 
@@ -267,7 +283,7 @@ class Middleware:
             self.pendingReplicas.pop(str(replica.uuid))
         self.peers[str(replica.uuid)] = peer_info
         self.replicaAlive[str(replica.uuid)] = time.time()
-        
+
         self.sendUpdatedPeerList()
         self.update_election_ring()
 
@@ -277,7 +293,7 @@ class Middleware:
             'backlog': self.history.get_backlog(),
         })
         replica.send(msg)
-    
+
     def sendUpdatedPeerList(self):
         self.logger.debug("\nSending replicas:\n{}".format('\n'.join([
             '\t{} (server_port={})'.format(uuid, str(info.server_port))
@@ -295,7 +311,7 @@ class Middleware:
                         'replica_port': peer.replica_port,
                         'election_port': peer.election_port,
                     },
-                } 
+                }
                 for uuid, peer in self.peers.items()
             ],
         })
@@ -323,10 +339,10 @@ class Middleware:
     def onJoinAccepted(self, msg):
         self.logger.info("Accepted into cluster")
         self.uuid = uuid.UUID(msg.body['uuid'])
-        
+
         self.vc = VectorClock(copyDict=msg.vc)
         self.history = History(history=msg.body['history'], backlog=msg.body['backlog'])
-        
+
         self.startElectionThread(self.replicaPeerInfo.election_port)
         time.sleep(0.5)
         self.election.start_election()
@@ -362,7 +378,7 @@ class Middleware:
     def startElectionThread(self, port):
         if self.electionThread:
             return
-        
+
         self.logger.info("Starting election thread on port {}".format(str(port)))
         self.election = LCR(self.peers.keys(), self.uuid, {
             uuid: peer.electionAddress() for uuid, peer in self.peers.items()
@@ -390,7 +406,7 @@ class Middleware:
         if primary_uuid == str(self.uuid):
             # Own message. Ignore
             return
-        
+
         if primary_uuid != self.electedLeader:
             # Primary was not elected. Ignore
             return
@@ -443,7 +459,8 @@ class Middleware:
         vc = VectorClock(copyDict=self.vc.vcDictionary.copy())
         self.history.on_new_message(message, send_client.uuid)
         for r in self.replicas.values():
-            data = Message.encode(vc, 'history_replica', True, {'vc': message.vc, 'msg': message.body, 'sender_uuid': str(send_client.uuid)})
+            data = Message.encode(vc, 'history_replica', True,
+                                  {'vc': message.vc, 'msg': message.body, 'sender_uuid': str(send_client.uuid)})
             r.send(data)
 
         for client in self.clients.values():
@@ -481,6 +498,7 @@ class Client:
         self._conn.send(data)
         self._conn.shutdown()
 
+
 class Replica:
     def __init__(self, conn):
         self.uuid = uuid.uuid4()
@@ -496,8 +514,10 @@ class Replica:
             Middleware.get().joinReplica(self, msg.body)
         elif msg.type == 'rejoin_replica_req':
             Middleware.get().rejoinReplica(self, msg.body)
-        elif msg.type == 'heartbeat':
+        elif msg.type == 'ping':
             Middleware.get().receivedHeatbeatFromReplica(self)
+            pong_msg = Message.encode(Middleware.get().vc, 'pong', True, None)
+            self.send(pong_msg)
 
     def closeConnection(self):
         self._conn.shutdown()

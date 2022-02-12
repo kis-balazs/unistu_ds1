@@ -201,6 +201,7 @@ class ConnectionListener(threading.Thread):
 class Connection(threading.Thread):
     def __init__(self, sock, address, name):
         threading.Thread.__init__(self)
+        self._byPeer = False
         self._stopRequest = False
         self._sock = sock
         self._sock.setblocking(0)
@@ -218,12 +219,13 @@ class Connection(threading.Thread):
             self._logger.error("Some error: " + str(e))
             traceback.print_exc()
         finally:
-            self.onClose(not self._stopRequest)
+            self.onClose(not self._stopRequest or self._byPeer)
             self._sock.close()
             self._logger.debug("Connection closed")
 
-    def shutdown(self):
+    def shutdown(self, byPeer=False):
         self._stopRequest = True
+        self._byPeer = byPeer
 
     def getAddress(self):
         return self._address
