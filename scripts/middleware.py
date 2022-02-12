@@ -231,6 +231,10 @@ class Middleware:
             self.replicaHeartbeatTimer.cancel()
         self.replicaHeartbeatTimer = None
 
+        if self.pingTimeoutTimer:
+            self.pingTimeoutTimer.cancel()
+        self.pingTimeoutTimer = None
+
     def receivedHeatbeatFromReplica(self, replica):
         self.logger.debug("Received heartbeat from {}".format(str(replica.uuid)))
         self.replicaAlive[str(replica.uuid)] = time.time()

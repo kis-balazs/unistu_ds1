@@ -37,7 +37,7 @@ class Client(threading.Thread):
             while not self._stopRequest:
                 ready = select.select([self._sock], [], [], 0.5)
                 if ready[0]:
-                    data = self._sock.recv(1024)
+                    data = self._sock.recv(8 * 1024)
                     if data:
                         self._handleMessage(data)
         finally:

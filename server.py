@@ -242,9 +242,9 @@ class Connection(threading.Thread):
     def _eventLoop(self):
         outputs = []
         while not self._stopRequest or not self._outQueue.empty():
-            readable, writable, exceptional = select.select([self._sock], outputs, [], 0.5)
+            readable, writable, exceptional = select.select([self._sock], outputs, [], .5)
             if self._sock in readable and not self._stopRequest:
-                data = self._sock.recv(4096)
+                data = self._sock.recv(8 * 1024)
                 if data:
                     self.onData(data)
 
