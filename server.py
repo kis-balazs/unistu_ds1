@@ -13,8 +13,9 @@ import discovery
 from scripts.middleware import Middleware, PeerInfo
 
 SERVER_PORT = 5001
-REPLCIA_PORT = 5002
+REPLICA_PORT = 5002
 ELECTION_PORT = 5003
+
 
 class Server(threading.Thread):
     def __init__(self, server_port, replica_port, election_port, skip_discovery):
@@ -27,8 +28,8 @@ class Server(threading.Thread):
         self._client_listener_started = threading.Event()
         self._replica_listener_started = threading.Event()
 
-        own_host = socket.gethostname()
-        own_ip = socket.gethostbyname(own_host)
+        # own_host = socket.gethostname()
+        # own_ip = socket.gethostbyname(own_host)
         self._peer_info = PeerInfo('127.0.1.1', server_port, replica_port, election_port)
 
         self._replicaListenerThread = None
@@ -40,24 +41,24 @@ class Server(threading.Thread):
         while not self._stop_request:
             self._logger.info("Searching for primary...")
             Middleware.get().setServerHandle(self)
-            
+
             primary = None if self._skip_discovery else discovery.find_primary()
             if self._stop_request:
                 break
-            
+
             self._startDiscoveryThread(primary is None)
             if primary is None:
                 self._logger.info("No primary found")
                 # We will become primary
                 self.promote()
                 Middleware.get().onPrimaryStart(self._peer_info)
-            else: 
+            else:
                 # Start in replica mode
                 self._logger.info("Primary found")
                 self.demote(primary)
 
             self.loop()
-    
+
     def loop(self):
         thread_active = True
         while thread_active:
@@ -94,7 +95,7 @@ class Server(threading.Thread):
         self._replica_listener_started.wait()
 
         discovery.send_primary_up(Middleware.get().uuid)
-        
+
         if self._replicaThread:
             self._replicaThread.shutdown()
 
@@ -140,17 +141,19 @@ class Server(threading.Thread):
         self._discoveryThread.start()
 
     def _startClientListenerThread(self):
-        self._clientListenerThread = ConnectionListener("client_listener", self._peer_info.server_port, ClientConnection, event=self._client_listener_started)
+        self._clientListenerThread = ConnectionListener("client_listener", self._peer_info.server_port,
+                                                        ClientConnection, event=self._client_listener_started)
         self._clientListenerThread.start()
 
     def _startReplicaListenerThread(self):
-        self._replicaListenerThread = ConnectionListener("replica_listener", self._peer_info.replica_port, ReplicaServerConnection, event=self._replica_listener_started)
+        self._replicaListenerThread = ConnectionListener("replica_listener", self._peer_info.replica_port,
+                                                         ReplicaServerConnection, event=self._replica_listener_started)
         self._replicaListenerThread.start()
 
     def _startReplicaThread(self):
         self._replicaThread = ReplicaClientConnection(self._primary, self._peer_info)
         self._replicaThread.start()
-    
+
     def _on_primary_up(self, primary_uuid):
         Middleware.get().onPrimaryUpMsg(primary_uuid)
 
@@ -310,7 +313,8 @@ class ReplicaServerConnection(Connection):
 
 class ReplicaClientConnection(Connection):
     def __init__(self, primary, peer_info):
-        Connection.__init__(self, self._createSocket(primary.replicaAddress()), primary.replicaAddress(), "replica_client_conn")
+        Connection.__init__(self, self._createSocket(primary.replicaAddress()), primary.replicaAddress(),
+                            "replica_client_conn")
         self._primary = primary
         self._peer_info = peer_info
 
@@ -330,15 +334,17 @@ class ReplicaClientConnection(Connection):
         sock.connect(address)
         return sock
 
+
 if __name__ == '__main__':
     logging.basicConfig(format='[%(asctime)s] %(levelname)s (%(name)s) %(message)s', level=logging.DEBUG)
 
     server_port = SERVER_PORT
-    replica_port = REPLCIA_PORT
+    replica_port = REPLICA_PORT
     election_port = ELECTION_PORT
     skip_discovery = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 's:r:e:p', ['server-port=', 'replica-port=', 'election_port=', 'skip-discovery'])
+        opts, args = getopt.getopt(sys.argv[1:], 's:r:e:p',
+                                   ['server-port=', 'replica-port=', 'election_port=', 'skip-discovery'])
         for o, a in opts:
             if o in ('-s', '--server-port'):
                 server_port = int(a)
